@@ -1,0 +1,2340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f6f5f2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/png" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>日迹 · Daily Log</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f6f5f2; --card:#ffffff; --ink:#1c1b19; --ink2:#6b6862; --ink3:#a5a19a;
+  --line:#e9e6df; --line2:#f2efe9;
+  --accent:#c85c3f; --accent-soft:#fbeee9; --accent-line:#f0d5ca;
+  --green:#4f7d63; --green-soft:#eef5f0;
+  --blue:#5b7290; --blue-soft:#eef2f7;
+  --radius:16px;
+  --shadow:0 1px 2px rgba(28,27,25,.04), 0 10px 30px -18px rgba(28,27,25,.28);
+}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  font-size:15px; line-height:1.6;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+#app{max-width:700px;margin:0 auto;padding:0 18px 120px;min-height:100vh}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;font-size:inherit}
+input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
+.muted{color:var(--ink3)}
+.hide{display:none!important}
+
+/* ---------- topbar ---------- */
+.topbar{padding:26px 2px 14px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.brand{font-size:13px;letter-spacing:.16em;color:var(--ink3);text-transform:uppercase;font-weight:600}
+.greet-date{font-size:22px;font-weight:650;letter-spacing:-.01em;margin-top:2px}
+.greet-sub{font-size:13.5px;color:var(--ink2);margin-top:3px}
+.today-badge{font-size:12px;padding:5px 11px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+
+/* ---------- quick add ---------- */
+.quick{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:4px 4px 4px 16px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow);transition:border-color .18s,box-shadow .18s}
+.quick:focus-within{border-color:var(--accent-line);box-shadow:0 0 0 4px var(--accent-soft)}
+.quick input{flex:1;border:none;outline:none;background:none;padding:13px 0;font-size:15px;min-width:0}
+.quick input::placeholder{color:var(--ink3)}
+.quick button{width:38px;height:38px;border-radius:11px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto;transition:transform .12s,opacity .15s}
+.quick button:active{transform:scale(.94)}
+.quick-hint{font-size:12.5px;color:var(--ink2);padding:7px 6px 0;min-height:20px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.quick-hint b{color:var(--accent);font-weight:600}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:2px 8px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+/* 输入框聚焦时出现的快捷标签条 */
+.qtagbar{display:none;gap:6px;overflow-x:auto;padding:8px 10px;align-items:center;scrollbar-width:none;-ms-overflow-style:none;background:#fbfaf7;border:1px solid var(--line2);border-radius:11px;margin-top:8px}
+.qtagbar::-webkit-scrollbar{display:none}
+.qtagbar.show{display:flex}
+.qtag-label{font-size:11.5px;color:var(--ink3);flex:0 0 auto;padding-right:1px;white-space:nowrap}
+.qtag{flex:0 0 auto;font-size:12px;padding:4px 10px;border-radius:99px;border:1px solid var(--line);background:#fff;color:var(--ink2);display:inline-flex;align-items:center;gap:5px;font-weight:550;transition:all .14s}
+.qtag:hover{border-color:#d3cec5;background:#faf9f6}
+.qtag:active{transform:scale(.96)}
+.qtag i{width:5px;height:5px;border-radius:50%;display:block}
+
+/* 卡片内的快捷新建入口 */
+.addrow{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;margin-top:8px;border:1px dashed var(--line);border-radius:11px;color:var(--ink2);font-size:13px;font-weight:550;transition:all .16s;background:transparent}
+.addrow:hover{border-color:var(--accent-line);color:var(--accent);background:var(--accent-soft)}
+.addrow:active{transform:scale(.99)}
+
+/* ---------- card ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-top:14px;box-shadow:var(--shadow)}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-size:14.5px;font-weight:650;letter-spacing:-.005em}
+.card-meta{font-size:12.5px;color:var(--ink3);font-variant-numeric:tabular-nums}
+
+/* progress */
+.bar{height:5px;border-radius:99px;background:var(--line2);overflow:hidden;margin:-4px 0 16px}
+.bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#d9764f,#c85c3f);transition:width .45s cubic-bezier(.4,0,.2,1)}
+
+/* ---------- list item ---------- */
+.list{display:flex;flex-direction:column;gap:2px}
+.item{display:flex;align-items:flex-start;gap:12px;padding:11px 8px 11px 6px;border-radius:11px;transition:background .14s}
+.item:hover{background:#faf9f6}
+.check{width:20px;height:20px;border-radius:50%;border:1.6px solid #d5d1c9;flex:0 0 auto;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .16s}
+.check:hover{border-color:var(--accent)}
+.check svg{opacity:0;transition:opacity .15s}
+.item.done .check{background:var(--green);border-color:var(--green)}
+.item.done .check svg{opacity:1}
+.item-main{flex:1;min-width:0;cursor:pointer}
+.item-title{font-size:14.5px;font-weight:520;word-break:break-word;transition:color .15s}
+.item.done .item-title{color:var(--ink3);text-decoration:line-through;text-decoration-color:#cfcbc3;text-decoration-thickness:1px}
+.item-meta{display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap}
+.item-time{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:3px}
+.tag{font-size:11px;padding:1.5px 8px;border-radius:5px;white-space:nowrap;font-weight:600;display:inline-flex;align-items:center;gap:4px;line-height:1.5}
+.tag i{width:5px;height:5px;border-radius:50%;display:block;flex:0 0 auto}
+.tag.empty-tag{color:var(--ink3);background:var(--line2);font-weight:500}
+
+/* ---------- filter bar ---------- */
+.filterbar{display:flex;gap:6px;overflow-x:auto;padding:12px 2px 2px;margin-bottom:-2px;scrollbar-width:none;-ms-overflow-style:none}
+.filterbar::-webkit-scrollbar{display:none}
+.fchip{flex:0 0 auto;font-size:12.5px;padding:6px 12px;border-radius:99px;background:#fff;border:1px solid var(--line);color:var(--ink2);white-space:nowrap;transition:all .15s;font-weight:550;display:inline-flex;align-items:center;gap:5px}
+.fchip:hover{border-color:#d8d3ca}
+.fchip i{width:6px;height:6px;border-radius:50%;display:block}
+.fchip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.fchip.on i{background:#fff!important}
+
+/* ---------- tag picker (modal) ---------- */
+.tagpick{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px}
+.pick{font-size:13px;padding:7px 13px;border-radius:9px;border:1px solid var(--line);background:#fcfbf9;color:var(--ink2);transition:all .15s;font-weight:550;display:inline-flex;align-items:center;gap:5px}
+.pick i{width:6px;height:6px;border-radius:50%;display:block}
+.pick:hover{border-color:#d8d3ca}
+.pick.on{font-weight:650}
+
+/* ---------- tag stats (weekly) ---------- */
+.tagstats{display:flex;flex-direction:column;gap:9px}
+.ts-row{display:flex;align-items:center;gap:10px;font-size:12.5px}
+.ts-name{flex:0 0 62px;color:var(--ink2);display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ts-name i{width:6px;height:6px;border-radius:50%;flex:0 0 auto}
+.ts-track{flex:1;height:7px;background:var(--line2);border-radius:99px;overflow:hidden}
+.ts-track i{display:block;height:100%;border-radius:99px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.ts-val{flex:0 0 52px;text-align:right;color:var(--ink3);font-variant-numeric:tabular-nums;font-size:11.5px}
+
+/* ---------- tag manage (settings) ---------- */
+.tm-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line2)}
+.tm-row:last-child{border-bottom:none}
+.tm-name{width:88px;padding:6px 9px;border:1px solid transparent;border-radius:8px;background:transparent;font-size:13.5px;font-weight:550;outline:none;transition:all .15s}
+.tm-name:hover{background:#faf9f6}
+.tm-name:focus{border-color:var(--accent-line);background:#fff}
+.swatches{display:flex;gap:5px;flex:1;flex-wrap:wrap}
+.sw{width:17px;height:17px;border-radius:50%;border:2px solid transparent;transition:all .14s;position:relative}
+.sw:hover{transform:scale(1.14)}
+.sw.on{border-color:var(--ink);box-shadow:inset 0 0 0 2px #fff}
+.tm-del{width:26px;height:26px;border-radius:7px;color:var(--ink3);font-size:16px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.tm-del:hover{background:#fbeceb;color:#b4472f}
+.addtag{font-size:12.5px;color:var(--accent);font-weight:600;padding:5px 10px;border-radius:8px;background:var(--accent-soft)}
+.addtag:hover{background:#f7e2da}
+.item-del{opacity:0;width:26px;height:26px;border-radius:7px;color:var(--ink3);flex:0 0 auto;font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.item:hover .item-del{opacity:1}
+.item-del:hover{background:#fbeceb;color:#b4472f}
+
+.empty{text-align:center;padding:26px 10px;color:var(--ink3);font-size:13.5px}
+.empty-big{font-size:26px;margin-bottom:6px;opacity:.5}
+
+/* ---------- daily note ---------- */
+textarea{width:100%;border:1px solid var(--line);border-radius:11px;padding:12px 14px;resize:vertical;outline:none;background:#fcfbf9;line-height:1.7;transition:border-color .16s,background .16s;min-height:88px;font-size:14.5px}
+textarea:focus{border-color:var(--accent-line);background:#fff}
+textarea::placeholder{color:var(--ink3)}
+
+/* ---------- focus / pomodoro ---------- */
+.pomo{display:flex;flex-direction:column;align-items:center;padding:8px 0 4px}
+.ringwrap{position:relative;width:236px;height:236px;display:flex;align-items:center;justify-content:center;margin:6px 0 4px}
+.ring{position:absolute;inset:0;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-linecap:round}
+.ring .bg{stroke:var(--line2);stroke-width:9}
+.ring .fg{stroke:var(--accent);stroke-width:9;transition:stroke-dashoffset .3s linear,stroke .4s}
+.ring.break .fg{stroke:var(--green)}
+.pomo-inner{text-align:center;z-index:1}
+.pomo-time{font-size:46px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1}
+.pomo-mode{font-size:12px;letter-spacing:.16em;color:var(--ink3);margin-top:5px;text-transform:uppercase;font-weight:600}
+.pomo-mode.focus{color:var(--accent)}
+.pomo-mode.break{color:var(--green)}
+.pomo-task{margin:16px 0 6px;width:100%;max-width:320px}
+.pomo-task select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#fcfbf9;outline:none;font-size:13.5px;color:var(--ink2)}
+.pomo-actions{display:flex;gap:10px;margin-top:16px;width:100%;max-width:320px}
+.btn{flex:1;padding:13px;border-radius:12px;font-size:14.5px;font-weight:600;transition:transform .12s,opacity .15s,background .15s;text-align:center}
+.btn:active{transform:scale(.975)}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 6px 18px -8px rgba(200,92,63,.75)}
+.btn-primary:hover{background:#bd5236}
+.btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink2)}
+.btn-ghost:hover{border-color:#d8d3ca}
+.btn-green{background:var(--green);color:#fff;box-shadow:0 6px 18px -8px rgba(79,125,99,.7)}
+.pomo-stats{display:flex;gap:10px;width:100%;max-width:320px;margin-top:20px}
+.pstat{flex:1;background:#faf9f6;border:1px solid var(--line2);border-radius:12px;padding:11px;text-align:center}
+.pstat b{display:block;font-size:19px;font-weight:650;font-variant-numeric:tabular-nums}
+.pstat span{font-size:11.5px;color:var(--ink3)}
+
+/* ---------- weekly ---------- */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.stat{background:#faf9f6;border:1px solid var(--line2);border-radius:12px;padding:12px 10px}
+.stat b{display:block;font-size:21px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat span{font-size:11.5px;color:var(--ink3);display:block;margin-top:2px}
+.chart{display:flex;align-items:flex-end;gap:7px;height:92px;margin:6px 0 2px}
+.chart .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.chart .bar-v{width:100%;max-width:34px;border-radius:5px 5px 3px 3px;background:var(--line2);min-height:3px;transition:height .5s cubic-bezier(.4,0,.2,1);position:relative}
+.chart .col.has .bar-v{background:linear-gradient(180deg,#e08a68,#c85c3f)}
+.chart .col.today .bar-v{box-shadow:0 0 0 2px var(--accent-soft)}
+.chart .lbl{font-size:10.5px;color:var(--ink3)}
+.chart .col.today .lbl{color:var(--accent);font-weight:600}
+.week-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.week-range{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.wk-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--ink2)}
+.wk-btn:hover{border-color:#d8d3ca}
+.dlist{font-size:13.5px;line-height:1.85}
+.dlist .row{display:flex;gap:9px;padding:4px 0;align-items:baseline}
+.dlist .d{color:var(--ink3);font-variant-numeric:tabular-nums;flex:0 0 62px;font-size:12px}
+.dlist .t{flex:1;word-break:break-word}
+.dlist .row.ok .t{color:var(--ink3)}
+.sec-title{font-size:12px;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase;font-weight:650;margin:18px 0 8px}
+.sec-title:first-child{margin-top:0}
+.draft{width:100%;min-height:300px;font-size:13.5px;line-height:1.85;font-family:ui-monospace,SFMono-Regular,"SF Mono",Consolas,monospace;background:#fcfbf9}
+
+/* ---------- settings ---------- */
+.field{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line2)}
+.field:last-child{border-bottom:none}
+.field label{font-size:14px}
+.field .desc{font-size:12px;color:var(--ink3);margin-top:1px}
+.field input[type=number]{width:70px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;text-align:center;outline:none;background:#fcfbf9;font-variant-numeric:tabular-nums}
+.field input[type=number]:focus{border-color:var(--accent-line)}
+.act-row{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
+.act-row .btn{flex:1 1 140px;padding:11px;font-size:13.5px}
+.note-tip{font-size:12.5px;color:var(--ink3);line-height:1.7;margin-top:14px;padding:12px 14px;background:#faf9f6;border-radius:10px;border:1px solid var(--line2)}
+.note-tip b{color:var(--ink2)}
+.badge{font-size:11.5px;padding:3px 9px;border-radius:99px;font-weight:650;white-space:nowrap}
+.badge.ok{background:var(--green-soft);color:var(--green)}
+.badge.warn{background:#fdf1e4;color:#a5642f}
+.badge.bad{background:#fbeceb;color:#b4472f}
+.warnbar{display:flex;gap:10px;align-items:flex-start;background:#fdf1e4;border:1px solid #f2dfc7;border-radius:12px;padding:12px 14px;margin-top:14px;font-size:12.5px;line-height:1.65;color:#8a5726}
+.warnbar b{color:#6f4420}
+.warnbar svg{flex:0 0 auto;margin-top:1px}
+.snaplist{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto}
+.snaprow{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:#fcfbf9}
+.snaprow .st{flex:1;min-width:0}
+.snaprow .sd{font-size:13px;font-weight:550;font-variant-numeric:tabular-nums}
+.snaprow .sm{font-size:11.5px;color:var(--ink3);margin-top:1px}
+.snaprow button{font-size:12.5px;font-weight:600;color:var(--accent);padding:6px 12px;border-radius:8px;background:var(--accent-soft);flex:0 0 auto}
+.snaprow button:hover{background:#f7e2da}
+
+/* ---------- tabbar ---------- */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;justify-content:center;padding:0 16px calc(10px + env(safe-area-inset-bottom))}
+.tabbar-inner{display:flex;gap:2px;background:rgba(255,255,255,.86);backdrop-filter:blur(18px) saturate(180%);-webkit-backdrop-filter:blur(18px) saturate(180%);border:1px solid var(--line);border-radius:18px;padding:6px;box-shadow:0 8px 30px -10px rgba(28,27,25,.22);max-width:420px;width:100%}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:13px;color:var(--ink3);transition:all .18s;font-size:10.5px;font-weight:550}
+.tab svg{width:20px;height:20px;stroke-width:1.7}
+.tab.active{color:var(--accent);background:var(--accent-soft)}
+.tab.active svg{stroke-width:2}
+
+/* ---------- modal ---------- */
+.mask{position:fixed;inset:0;background:rgba(28,27,25,.32);backdrop-filter:blur(3px);z-index:100;display:flex;align-items:flex-end;justify-content:center;padding:0;animation:fade .18s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes slideup{from{transform:translateY(20px);opacity:.6}to{transform:translateY(0);opacity:1}}
+.modal{background:#fff;width:100%;max-width:520px;border-radius:22px 22px 0 0;padding:22px 20px calc(22px + env(safe-area-inset-bottom));animation:slideup .22s cubic-bezier(.3,1,.4,1);max-height:90vh;overflow-y:auto}
+@media(min-width:560px){.mask{align-items:center;padding:20px}.modal{border-radius:22px;padding-bottom:22px}}
+.modal h3{margin:0 0 16px;font-size:16px;font-weight:650}
+.mfield{margin-bottom:13px}
+.mfield label{display:block;font-size:12px;color:var(--ink3);margin-bottom:5px;font-weight:550}
+.mfield input,.mfield textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;outline:none;background:#fcfbf9;font-size:14.5px}
+.mfield input:focus,.mfield textarea:focus{border-color:var(--accent-line);background:#fff}
+.mrow{display:flex;gap:10px}
+.mrow .mfield{flex:1}
+.mact{display:flex;gap:9px;margin-top:18px}
+.mact .btn{padding:12px}
+.btn-danger{background:#fbeceb;color:#b4472f}
+
+/* ---------- toast ---------- */
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(10px);background:#242320;color:#fff;font-size:13px;padding:10px 18px;border-radius:11px;opacity:0;pointer-events:none;transition:all .25s cubic-bezier(.3,1,.4,1);z-index:200;box-shadow:0 10px 30px -8px rgba(0,0,0,.4);max-width:88vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:430px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .greet-date{font-size:20px}
+  #app{padding:0 14px 116px}
+  .item-del{opacity:1}
+  .ringwrap{width:210px;height:210px}
+  .pomo-time{font-size:40px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="view"></div>
+</div>
+<div class="tabbar">
+  <div class="tabbar-inner" id="tabbar"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============================================================
+   日迹 Daily Log — 本地版 P0
+   数据全部存于本机 localStorage，不上传任何服务器
+   ============================================================ */
+
+const KEY = 'dailylog.v1';
+const PKEY = 'dailylog.pomo.v1';
+
+/* ---------------- 存储 ---------------- */
+const PALETTE = ['#5b7290','#7d5a8f','#4f7d63','#9a7434','#c85c3f','#3f7a8c','#a8563f','#7a766e'];
+
+function defaultTags(){
+  return [
+    { id:'work',     name:'工作', color:'#5b7290' },
+    { id:'meeting',  name:'会议', color:'#7d5a8f' },
+    { id:'personal', name:'个人', color:'#4f7d63' },
+    { id:'study',    name:'学习', color:'#9a7434' },
+    { id:'health',   name:'健康', color:'#c85c3f' }
+  ];
+}
+function defaultDB(){
+  return {
+    tasks: [],
+    sessions: [],
+    notes: {},
+    tags: defaultTags(),
+    settings: { pomo: 25, brk: 5 }
+  };
+}
+function normalizeDB(raw){
+  const d = Object.assign(defaultDB(), raw || {});
+  if(!Array.isArray(d.tasks)) d.tasks = [];
+  if(!Array.isArray(d.sessions)) d.sessions = [];
+  if(!d.notes || typeof d.notes !== 'object') d.notes = {};
+  if(!Array.isArray(d.tags) || !d.tags.length) d.tags = defaultTags();
+  d.settings = Object.assign({ pomo:25, brk:5 }, d.settings || {});
+  return d;
+}
+
+let db = defaultDB();
+try {
+  const raw = localStorage.getItem(KEY);
+  if(raw) db = normalizeDB(JSON.parse(raw));
+} catch(e){ db = defaultDB(); }
+
+/* ============================================================
+   持久化层
+   第一层 localStorage —— 同步、启动即用，但清缓存就没
+   第二层 IndexedDB   —— 浏览器内置数据库，容量大、有事务，不易被清
+   第三层 历史快照     —— 定期留档，误删/损坏可回滚
+   ============================================================ */
+const IDB_NAME  = 'dailylog';
+const IDB_VER   = 2;
+const SNAP_GAP  = 10 * 60 * 1000;   // 至少间隔 10 分钟存一份快照
+const SNAP_KEEP = 40;               // 最多保留 40 份
+
+let idb = null;
+let idbWriteTimer = null;
+let lastSnapAt = 0;
+
+const storageInfo = {
+  idb: false,
+  lastSaveAt: db.savedAt || 0,
+  snapshots: 0,
+  recovered: false,
+  lastExportAt: (db.settings && db.settings.lastExportAt) || 0
+};
+
+function openIDB(){
+  return new Promise((resolve) => {
+    if(typeof indexedDB === 'undefined') return resolve(null);
+    let req;
+    try { req = indexedDB.open(IDB_NAME, IDB_VER); }
+    catch(e){ return resolve(null); }
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains('state')) d.createObjectStore('state');
+      if(!d.objectStoreNames.contains('snapshots')) d.createObjectStore('snapshots', { keyPath: 'at' });
+      if(!d.objectStoreNames.contains('handles')) d.createObjectStore('handles');
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+    req.onblocked = () => resolve(null);
+  });
+}
+function idbWrite(store, value, key){
+  return new Promise((resolve) => {
+    if(!idb) return resolve(false);
+    try{
+      const tx = idb.transaction(store, 'readwrite');
+      const os = tx.objectStore(store);
+      if(key === undefined) os.put(value); else os.put(value, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
+    }catch(e){ resolve(false); }
+  });
+}
+function idbRead(store, key){
+  return new Promise((resolve) => {
+    if(!idb) return resolve(null);
+    try{
+      const tx = idb.transaction(store, 'readonly');
+      const r = tx.objectStore(store).get(key);
+      r.onsuccess = () => resolve(r.result || null);
+      r.onerror = () => resolve(null);
+    }catch(e){ resolve(null); }
+  });
+}
+function idbList(store){
+  return new Promise((resolve) => {
+    if(!idb) return resolve([]);
+    try{
+      const tx = idb.transaction(store, 'readonly');
+      const r = tx.objectStore(store).getAll();
+      r.onsuccess = () => resolve(r.result || []);
+      r.onerror = () => resolve([]);
+    }catch(e){ resolve([]); }
+  });
+}
+function idbDel(store, key){
+  return new Promise((resolve) => {
+    if(!idb) return resolve(false);
+    try{
+      const tx = idb.transaction(store, 'readwrite');
+      tx.objectStore(store).delete(key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    }catch(e){ resolve(false); }
+  });
+}
+
+async function pruneSnapshots(){
+  const all = await idbList('snapshots');
+  if(all.length <= SNAP_KEEP) return;
+  all.sort((a,b) => a.at - b.at);
+  const extra = all.slice(0, all.length - SNAP_KEEP);
+  for(const s of extra) await idbDel('snapshots', s.at);
+}
+
+function save(){
+  db.savedAt = Date.now();
+  storageInfo.lastSaveAt = db.savedAt;
+  const json = JSON.stringify(db);
+
+  // 第一层：同步写入，保证刷新不丢
+  try { localStorage.setItem(KEY, json); }
+  catch(e){ /* 配额满，交给 IndexedDB */ }
+
+  // 第二层：IndexedDB，防抖 200ms，避免每次按键都写盘
+  if(idb){
+    clearTimeout(idbWriteTimer);
+    idbWriteTimer = setTimeout(() => {
+      idbWrite('state', JSON.stringify(db), 'main');
+    }, 200);
+
+    // 第三层：快照留档
+    const now = Date.now();
+    if(now - lastSnapAt > SNAP_GAP){
+      lastSnapAt = now;
+      const snap = { at: now, json, tasks: db.tasks.length, notes: Object.keys(db.notes).length };
+      idbWrite('snapshots', snap).then(() => pruneSnapshots());
+      storageInfo.snapshots++;
+    }
+  }
+
+  // 第四层：云端（防抖 1.5 秒，避免每敲一个字就发请求）
+  schedulePush();
+  // 第五层：文件夹备份（防抖 3 秒，交给坚果云 / OneDrive 去同步）
+  scheduleFolderWrite();
+}
+
+/* 启动自愈：比较两层的保存时间，取更新的那份 */
+async function bootStorage(){
+  idb = await openIDB();
+  storageInfo.idb = !!idb;
+  if(!idb){
+    render();
+    toast('注意：浏览器数据库不可用，已退回单层存储，请定期导出备份');
+    return;
+  }
+
+  const rawIdb = await idbRead('state', 'main');
+  let idbDB = null;
+  try { if(rawIdb) idbDB = normalizeDB(JSON.parse(rawIdb)); } catch(e){ idbDB = null; }
+
+  const localAt = db.savedAt || 0;
+  const idbAt = idbDB ? (idbDB.savedAt || 0) : 0;
+
+  if(idbDB && idbAt > localAt){
+    // 本地缓存落后或已损坏，从数据库恢复
+    db = idbDB;
+    try { localStorage.setItem(KEY, JSON.stringify(db)); } catch(e){}
+    storageInfo.recovered = true;
+    storageInfo.lastSaveAt = db.savedAt || Date.now();
+    migrateTags();
+    render();
+    toast('已从本地数据库恢复最新数据');
+  } else {
+    // 本地是最新的（或数据库还是空的），回写一份
+    idbWrite('state', JSON.stringify(db), 'main');
+    if(db.tasks.length) lastSnapAt = Date.now();
+  }
+
+  const snaps = await idbList('snapshots');
+  storageInfo.snapshots = snaps.length;
+  if(state.tab === 'settings') render();
+}
+
+function ago(ts){
+  if(!ts) return '—';
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if(s < 10) return '刚刚';
+  if(s < 60) return s + ' 秒前';
+  if(s < 3600) return Math.floor(s/60) + ' 分钟前';
+  if(s < 86400) return Math.floor(s/3600) + ' 小时前';
+  const d = Math.floor(s/86400);
+  if(d < 30) return d + ' 天前';
+  return fmtShort(ymd(new Date(ts)));
+}
+
+/* ============================================================
+   云端同步（Supabase）
+   本地三层始终是缓存，云端才是权威副本
+   ============================================================ */
+const CFG_KEY = 'dailylog.supabase.v1';
+const TABLE   = 'daily_log';
+
+const syncState = {
+  available: false,
+  configured: false,
+  user: null,
+  status: 'idle',      // idle | syncing | synced | error
+  lastSyncAt: 0,
+  lastPushAt: 0,
+  error: ''
+};
+
+let sb = null;
+let suppressPush = false;
+let pushTimer = null;
+
+function getCfg(){
+  try{
+    const raw = localStorage.getItem(CFG_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+function setCfg(cfg){
+  try{ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }catch(e){}
+}
+
+function setupSQL(){
+  return [
+    '-- 在 Supabase 控制台 → SQL Editor 里整段粘贴执行',
+    'create table if not exists public.daily_log (',
+    '  user_id    uuid primary key references auth.users(id) on delete cascade,',
+    "  data       jsonb not null default '{}'::jsonb,",
+    '  updated_at timestamptz not null default now()',
+    ');',
+    '',
+    'alter table public.daily_log enable row level security;',
+    '',
+    'drop policy if exists own_data_select on public.daily_log;',
+    'create policy own_data_select on public.daily_log',
+    '  for select using (auth.uid() = user_id);',
+    '',
+    'drop policy if exists own_data_insert on public.daily_log;',
+    'create policy own_data_insert on public.daily_log',
+    '  for insert with check (auth.uid() = user_id);',
+    '',
+    'drop policy if exists own_data_update on public.daily_log;',
+    'create policy own_data_update on public.daily_log',
+    '  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);',
+    '',
+    '-- 开启实时同步：多端改动互相推送',
+    'alter publication supabase_realtime add table public.daily_log;'
+  ].join('\n');
+}
+
+async function initSupabase(){
+  syncState.available = !!(window.supabase && window.supabase.createClient);
+  if(!syncState.available){
+    syncState.error = '同步组件没加载出来（可能没联网）';
+    if(state.tab === 'settings') render();
+    return;
+  }
+  const cfg = getCfg();
+  if(!cfg || !cfg.url || !cfg.key){
+    syncState.configured = false;
+    if(state.tab === 'settings') render();
+    return;
+  }
+  try{
+    sb = window.supabase.createClient(cfg.url, cfg.key, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+    });
+    syncState.configured = true;
+    const { data } = await sb.auth.getSession();
+    syncState.user = (data && data.session) ? data.session.user : null;
+    if(syncState.user){
+      await pullFromCloud(true);
+      subscribeRealtime();
+    }
+  }catch(e){
+    syncState.error = '连接失败：' + (e.message || e);
+  }
+  if(state.tab === 'settings') render();
+}
+
+async function pullFromCloud(initial){
+  if(!sb || !syncState.user) return false;
+  try{
+    syncState.status = 'syncing';
+    const { data, error } = await sb.from(TABLE)
+      .select('data, updated_at')
+      .eq('user_id', syncState.user.id)
+      .maybeSingle();
+    if(error) throw error;
+
+    if(!data || !data.data){
+      await pushToCloud(true);          // 云端还是空的，把本地推上去
+    } else {
+      const remoteAt = new Date(data.updated_at).getTime();
+      const localAt = db.savedAt || 0;
+      if(remoteAt > localAt + 1500){
+        suppressPush = true;
+        db = normalizeDB(data.data);
+        db.savedAt = remoteAt;
+        save();
+        suppressPush = false;
+        migrateTags();
+        render();
+        if(!initial) toast('已同步云端的最新改动');
+      } else if(localAt > remoteAt + 1500){
+        await pushToCloud(true);        // 本地更新，推上去
+      }
+    }
+    syncState.status = 'synced';
+    syncState.lastSyncAt = Date.now();
+    syncState.error = '';
+    if(state.tab === 'settings') render();
+    return true;
+  }catch(e){
+    syncState.status = 'error';
+    syncState.error = e.message || String(e);
+    if(state.tab === 'settings') render();
+    return false;
+  }
+}
+
+async function pushToCloud(force){
+  if(!sb || !syncState.user) return false;
+  try{
+    syncState.status = 'syncing';
+    const now = new Date();
+    const { error } = await sb.from(TABLE).upsert({
+      user_id: syncState.user.id,
+      data: db,
+      updated_at: now.toISOString()
+    }, { onConflict: 'user_id' });
+    if(error) throw error;
+    syncState.status = 'synced';
+    syncState.lastSyncAt = Date.now();
+    syncState.lastPushAt = now.getTime();
+    syncState.error = '';
+    if(state.tab === 'settings') render();
+    return true;
+  }catch(e){
+    syncState.status = 'error';
+    syncState.error = e.message || String(e);
+    if(state.tab === 'settings') render();
+    return false;
+  }
+}
+
+function schedulePush(){
+  if(!sb || !syncState.user || suppressPush) return;
+  syncState.status = 'syncing';
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => { pushToCloud(); }, 1500);
+}
+
+function subscribeRealtime(){
+  if(!sb || !syncState.user) return;
+  try{
+    sb.channel('daily_log_sync')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: TABLE,
+        filter: 'user_id=eq.' + syncState.user.id
+      }, (payload) => {
+        const row = payload && payload.new;
+        if(!row || !row.data) return;
+        const at = new Date(row.updated_at).getTime();
+        if(at <= syncState.lastPushAt + 3000) return;   // 自己写入的回声
+        suppressPush = true;
+        db = normalizeDB(row.data);
+        db.savedAt = at;
+        save();
+        suppressPush = false;
+        render();
+        toast('已同步其他设备的改动');
+      })
+      .subscribe();
+  }catch(e){ /* 实时通道失败不影响手动同步 */ }
+}
+
+async function sbRegister(email, pwd){
+  if(!sb) return { ok:false, msg:'还没连接云端' };
+  const { data, error } = await sb.auth.signUp({ email, password: pwd });
+  if(error) return { ok:false, msg: error.message };
+  if(data.session){
+    syncState.user = data.user;
+    await pullFromCloud(true);
+    subscribeRealtime();
+    return { ok:true, msg:'注册成功，已登录' };
+  }
+  return { ok:false, msg:'注册成功。去邮箱点确认链接，再回来登录' };
+}
+
+async function sbLogin(email, pwd){
+  if(!sb) return { ok:false, msg:'还没连接云端' };
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pwd });
+  if(error) return { ok:false, msg: error.message };
+  syncState.user = data.user;
+  await pullFromCloud(true);
+  subscribeRealtime();
+  return { ok:true, msg:'已登录并同步' };
+}
+
+async function sbLogout(){
+  if(!sb) return;
+  try{ await sb.auth.signOut(); }catch(e){}
+  syncState.user = null;
+  syncState.status = 'idle';
+  syncState.lastSyncAt = 0;
+  render();
+  toast('已退出云端账号，本地数据仍在');
+}
+
+/* ============================================================
+   文件夹备份（配合坚果云 / OneDrive 自动同步）
+   每次改动后自动写一份 JSON 到你选的目录，网盘负责把它传到别的设备。
+   这是独立于云端的第二份备份。
+   仅在桌面版 Chrome / Edge 可用（File System Access API）。
+   ============================================================ */
+let dirHandle = null;
+let folderTimer = null;
+const folderInfo = { supported:false, name:'', lastWriteAt:0, needPerm:false, error:'' };
+
+function folderSupported(){
+  return typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
+}
+
+async function initFolder(){
+  folderInfo.supported = folderSupported();
+  if(!folderInfo.supported) return;
+  try{
+    const meta = await idbRead('handles', 'meta');
+    if(meta && meta.lastWriteAt) folderInfo.lastWriteAt = meta.lastWriteAt;
+    const h = await idbRead('handles', 'dir');
+    if(h){
+      dirHandle = h;
+      folderInfo.name = h.name || '已选文件夹';
+      try{
+        const perm = await h.queryPermission({ mode:'readwrite' });
+        folderInfo.needPerm = perm !== 'granted';
+      }catch(e){ folderInfo.needPerm = true; }
+    }
+  }catch(e){}
+  if(state.tab === 'settings') render();
+}
+
+async function pickFolder(){
+  if(!folderSupported()){
+    toast('当前浏览器不支持，请用电脑版 Chrome 或 Edge');
+    return;
+  }
+  try{
+    const h = await window.showDirectoryPicker({ mode:'readwrite', id:'dailylog' });
+    dirHandle = h;
+    await idbWrite('handles', h, 'dir');
+    folderInfo.name = h.name;
+    folderInfo.needPerm = false;
+    folderInfo.error = '';
+    await writeBackupFile();
+    toast('已连接：' + h.name);
+    render();
+  }catch(e){
+    if(e && e.name !== 'AbortError') toast('选择失败：' + (e.message || e));
+  }
+}
+
+async function reauthFolder(){
+  if(!dirHandle) return;
+  try{
+    const perm = await dirHandle.requestPermission({ mode:'readwrite' });
+    folderInfo.needPerm = perm !== 'granted';
+    if(!folderInfo.needPerm){
+      await writeBackupFile();
+      toast('已重新授权');
+    } else {
+      toast('没有拿到写入权限');
+    }
+    render();
+  }catch(e){ toast('授权失败：' + (e.message || e)); }
+}
+
+async function closeFolder(){
+  dirHandle = null;
+  folderInfo.name = '';
+  folderInfo.lastWriteAt = 0;
+  folderInfo.needPerm = false;
+  try{ await idbDel('handles', 'dir'); }catch(e){}
+  render();
+  toast('已关闭文件夹备份');
+}
+
+async function writeBackupFile(){
+  if(!dirHandle) return false;
+  try{
+    const perm = await dirHandle.queryPermission({ mode:'readwrite' });
+    if(perm !== 'granted'){
+      // 重新授权必须有用户手势，这里只标记，等用户点按钮
+      folderInfo.needPerm = true;
+      if(state.tab === 'settings') render();
+      return false;
+    }
+    folderInfo.needPerm = false;
+    const json = JSON.stringify(db, null, 2);
+
+    const fh = await dirHandle.getFileHandle('dailylog.json', { create: true });
+    const w = await fh.createWritable();
+    await w.write(json);
+    await w.close();
+
+    // 每天再归档一份，方便回看历史版本
+    try{
+      const arch = await dirHandle.getDirectoryHandle('archive', { create: true });
+      const afh = await arch.getFileHandle('dailylog-' + todayStr() + '.json', { create: true });
+      const aw = await afh.createWritable();
+      await aw.write(json);
+      await aw.close();
+    }catch(e){ /* 归档失败不影响主备份 */ }
+
+    folderInfo.lastWriteAt = Date.now();
+    folderInfo.error = '';
+    idbWrite('handles', { lastWriteAt: folderInfo.lastWriteAt }, 'meta');
+    if(state.tab === 'settings') render();
+    return true;
+  }catch(e){
+    folderInfo.error = e.message || String(e);
+    if(state.tab === 'settings') render();
+    return false;
+  }
+}
+
+function scheduleFolderWrite(){
+  if(!dirHandle || folderInfo.needPerm) return;
+  clearTimeout(folderTimer);
+  folderTimer = setTimeout(() => { writeBackupFile(); }, 3000);
+}
+
+/* 旧数据迁移：tag 存的是中文名 → 转成 id。必须在所有工具函数就绪后调用 */
+function migrateTags(){
+  let changed = false;
+  db.tasks.forEach(t => {
+    if(!t.tag) return;
+    const byId = db.tags.find(x => x.id === t.tag);
+    if(byId) return;
+    const byName = db.tags.find(x => x.name === t.tag);
+    if(byName){ t.tag = byName.id; changed = true; return; }
+    // 没有匹配，按名字建一个新标签
+    const nt = {
+      id: 't' + uid().slice(0,6),
+      name: t.tag,
+      color: PALETTE[db.tags.length % PALETTE.length]
+    };
+    db.tags.push(nt);
+    t.tag = nt.id;
+    changed = true;
+  });
+  if(changed) save();
+}
+
+/* ---------------- 标签工具 ---------------- */
+function tagById(id){
+  if(!id) return null;
+  return db.tags.find(t => t.id === id) || null;
+}
+function hexA(hex, a){
+  const h = String(hex).replace('#','');
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function tagChip(id, cls){
+  const t = tagById(id);
+  if(!t) return '';
+  return `<span class="tag ${cls||''}" style="color:${t.color};background:${hexA(t.color,.11)}"><i style="background:${t.color}"></i>${esc(t.name)}</span>`;
+}
+function ensureTag(name){
+  const n = String(name).trim();
+  if(!n) return '';
+  const hit = db.tags.find(t => t.name === n || t.id === n);
+  if(hit) return hit.id;
+  const nt = { id: 't' + uid().slice(0,6), name: n, color: PALETTE[db.tags.length % PALETTE.length] };
+  db.tags.push(nt);
+  return nt.id;
+}
+function tagUsage(id){
+  return db.tasks.filter(t => t.tag === id).length;
+}
+function tagAggOf(tasks){
+  const rows = db.tags.map(tg => {
+    const items = tasks.filter(t => t.tag === tg.id);
+    return { tg, total: items.length, done: items.filter(x => x.done).length };
+  }).filter(x => x.total > 0).sort((a,b) => b.total - a.total);
+  const none = tasks.filter(t => !t.tag);
+  if(none.length){
+    rows.push({ tg: { id:'', name:'未分类', color:'#c9c5bd' }, total: none.length, done: none.filter(x=>x.done).length });
+  }
+  return rows;
+}
+
+/* save() 定义在上面的持久化层里 */
+
+/* ---------------- 工具 ---------------- */
+const pad = n => String(n).padStart(2,'0');
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const WD = ['周日','周一','周二','周三','周四','周五','周六'];
+
+function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function parseYmd(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function todayStr(){ return ymd(new Date()); }
+function addDays(s, n){ const d = parseYmd(s); d.setDate(d.getDate()+n); return ymd(d); }
+function mondayOf(s){ const d = parseYmd(s); const w = d.getDay(); d.setDate(d.getDate() + (w===0 ? -6 : 1-w)); return ymd(d); }
+function fmtMD(s){ const d = parseYmd(s); return (d.getMonth()+1)+'月'+d.getDate()+'日'; }
+function fmtShort(s){ const d = parseYmd(s); return pad(d.getMonth()+1)+'.'+pad(d.getDate()); }
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove('show'), 2200);
+}
+
+/* ---------------- 自然语言解析 ---------------- */
+const NUM_CN = {'零':0,'一':1,'两':2,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'十一':11,'十二':12};
+function cnNum(s){
+  if(!s) return null;
+  if(/^\d+$/.test(s)) return +s;
+  if(NUM_CN[s] != null) return NUM_CN[s];
+  return null;
+}
+
+/**
+ * 解析一句话 -> { date, start, title }
+ * 支持：今天/明天/后天/大后天/周X/下周X/礼拜X/周日上午/下午3点/3点半/15:30/晚上8点
+ */
+function parseQuick(text){
+  let s = ' ' + String(text).replace(/\s+/g,' ').trim() + ' ';
+  let date = null, start = '';
+  const consumed = [];
+
+  // --- 标签：#工作 / #会议 ---
+  const tags = [];
+  s = s.replace(/#([^\s#]+)/g, (m, g) => { tags.push(g); return ' '; });
+
+  // --- 日期 ---
+  const dateRules = [
+    [/大后天/, 3], [/后天/, 2], [/明天|明日|明早|明晚/, 1], [/今天|今日|今晚|今早/, 0]
+  ];
+  for(const [re, off] of dateRules){
+    const m = s.match(re);
+    if(m){ date = addDays(todayStr(), off); consumed.push(m[0]); s = s.replace(m[0],' '); break; }
+  }
+  if(!date){
+    let m = s.match(/(下)?(?:周|星期|礼拜)([一二三四五六日天])/);
+    if(m){
+      const target = '日一二三四五六'.indexOf(m[2].replace('天','日'));
+      const base = mondayOf(todayStr());
+      let off = (target === 0 ? 6 : target - 1);
+      if(m[1]) off += 7;
+      date = addDays(base, off);
+      consumed.push(m[0]); s = s.replace(m[0],' ');
+    }
+  }
+  if(!date) date = todayStr();
+
+  // --- 时间 ---
+  let pm = null;
+  const pmM = s.match(/(凌晨|早上|早晨|上午|中午|下午|傍晚|晚上|夜里|夜间)/);
+  if(pmM){ pm = pmM[1]; s = s.replace(pmM[0],' '); }
+
+  let m = s.match(/(\d{1,2})\s*[:：]\s*(\d{1,2})/);
+  if(m){
+    let h = +m[1], mi = +m[2];
+    if(pm && /下午|傍晚|晚上|夜里|夜间/.test(pm) && h < 12) h += 12;
+    if(pm === '中午' && h < 12) h += 12;
+    start = pad(h)+':'+pad(mi);
+    s = s.replace(m[0],' ');
+  } else {
+    m = s.match(/(\d{1,2}|十[一二]?|[一二两三四五六七八九])\s*[点時时]\s*(半|一刻|三刻|(\d{1,2})\s*分?)?/);
+    if(m){
+      let h = cnNum(m[1]);
+      if(h != null && h <= 24){
+        let mi = 0;
+        if(m[2] === '半') mi = 30;
+        else if(m[2] === '一刻') mi = 15;
+        else if(m[2] === '三刻') mi = 45;
+        else if(m[3]) mi = +m[3];
+        if(pm && /下午|傍晚|晚上|夜里|夜间/.test(pm) && h < 12) h += 12;
+        if(pm === '中午' && h < 12) h += 12;
+        if(h === 24) h = 0;
+        start = pad(h)+':'+pad(mi);
+        s = s.replace(m[0],' ');
+      }
+    }
+  }
+  if(pm) s = s.replace(pm,' ');
+
+  // --- 清理标题 ---
+  let title = s.replace(/^\s*(我)?(要|需要|得|去)?\s*/, '')
+               .replace(/\s+/g,' ')
+               .replace(/^[，,、。:：\-—\s]+|[，,、。:：\-—\s]+$/g,'')
+               .trim();
+
+  return { date, start, tags, title: title || String(text).trim() };
+}
+
+/* ---------------- 状态 ---------------- */
+const state = {
+  tab: 'today',
+  todayDate: todayStr(),
+  weekAnchor: mondayOf(todayStr()),
+  editingId: null,
+  modalTag: '',
+  filterTag: '',
+  draft: ''
+};
+
+/* ---------------- 番茄钟 ---------------- */
+const C = 2 * Math.PI * 104;
+let pomo = {
+  mode: 'focus',
+  total: db.settings.pomo * 60000,
+  remain: db.settings.pomo * 60000,
+  endAt: null,
+  running: false,
+  taskId: '',
+  startAt: null
+};
+try {
+  const p = localStorage.getItem(PKEY);
+  if(p){
+    const o = JSON.parse(p);
+    if(o && o.mode){
+      pomo = Object.assign(pomo, o);
+      if(pomo.running && pomo.endAt){
+        const left = pomo.endAt - Date.now();
+        if(left > 0) pomo.remain = left;
+        else { pomo.running = false; pomo.endAt = null; pomo.remain = 0; }
+      }
+    }
+  }
+} catch(e){}
+
+function savePomo(){ try{ localStorage.setItem(PKEY, JSON.stringify(pomo)); }catch(e){} }
+
+let audioCtx = null;
+function beep(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    [0, 0.22, 0.44].forEach((delay, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.value = i === 2 ? 880 : 660;
+      const t = audioCtx.currentTime + delay;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t); o.stop(t + 0.22);
+    });
+  }catch(e){}
+}
+function notify(title, body){
+  try{
+    if('Notification' in window && Notification.permission === 'granted'){
+      new Notification(title, { body, silent: false });
+    }
+  }catch(e){}
+}
+
+function finishPomo(){
+  const p = pomo;
+  if(p.mode === 'focus'){
+    const mins = Math.round(p.total / 60000);
+    db.sessions.push({
+      id: uid(), date: todayStr(), taskId: p.taskId || '',
+      minutes: mins, startAt: p.startAt || (Date.now() - p.total), endedAt: Date.now()
+    });
+    save();
+    beep();
+    notify('专注结束', '休息 ' + db.settings.brk + ' 分钟吧');
+    toast('完成一轮专注 · ' + mins + ' 分钟');
+    p.mode = 'break';
+    p.total = db.settings.brk * 60000;
+  } else {
+    beep();
+    notify('休息结束', '准备下一轮专注');
+    toast('休息结束，继续加油');
+    p.mode = 'focus';
+    p.total = db.settings.pomo * 60000;
+  }
+  p.remain = p.total; p.running = false; p.endAt = null; p.startAt = null;
+  savePomo();
+  render();
+}
+
+function startPomo(){
+  if(pomo.running) return;
+  if(pomo.remain <= 0) pomo.remain = pomo.total;
+  pomo.endAt = Date.now() + pomo.remain;
+  pomo.running = true;
+  if(pomo.mode === 'focus' && !pomo.startAt) pomo.startAt = Date.now();
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+  }catch(e){}
+  if('Notification' in window && Notification.permission === 'default'){
+    Notification.requestPermission().catch(()=>{});
+  }
+  savePomo();
+  render();
+}
+function pausePomo(){
+  if(!pomo.running) return;
+  pomo.remain = Math.max(0, pomo.endAt - Date.now());
+  pomo.running = false; pomo.endAt = null;
+  savePomo(); render();
+}
+function resetPomo(){
+  pomo.running = false; pomo.endAt = null; pomo.startAt = null;
+  pomo.total = (pomo.mode === 'focus' ? db.settings.pomo : db.settings.brk) * 60000;
+  pomo.remain = pomo.total;
+  savePomo(); render();
+}
+function skipPomo(){
+  if(pomo.mode === 'focus'){ pomo.mode = 'break'; pomo.total = db.settings.brk*60000; }
+  else { pomo.mode = 'focus'; pomo.total = db.settings.pomo*60000; }
+  pomo.running = false; pomo.endAt = null; pomo.startAt = null;
+  pomo.remain = pomo.total;
+  savePomo(); render();
+}
+
+setInterval(() => {
+  if(!pomo.running) return;
+  const left = pomo.endAt - Date.now();
+  pomo.remain = Math.max(0, left);
+  if(left <= 0){ finishPomo(); return; }
+  const t = document.getElementById('pomoTime');
+  const r = document.getElementById('ringFg');
+  if(t){
+    const s = Math.ceil(left / 1000);
+    t.textContent = pad(Math.floor(s/60)) + ':' + pad(s%60);
+  }
+  if(r){
+    const prog = pomo.remain / pomo.total;
+    r.style.strokeDashoffset = String(C * (1 - prog));
+  }
+}, 250);
+
+/* ---------------- 今日视图 ---------------- */
+function tasksOf(date){
+  return db.tasks.filter(t => t.date === date).sort((a,b) => {
+    if(a.start && b.start) return a.start.localeCompare(b.start);
+    if(a.start) return -1;
+    if(b.start) return 1;
+    return (a.createdAt||0) - (b.createdAt||0);
+  });
+}
+
+function viewToday(){
+  const d = state.todayDate;
+  const isToday = d === todayStr();
+  const day = parseYmd(d);
+  const all = tasksOf(d);
+  const filter = state.filterTag;
+  const list = filter ? all.filter(t => t.tag === filter) : all;
+  const doneCount = list.filter(t => t.done).length;
+  const pct = list.length ? Math.round(doneCount / list.length * 100) : 0;
+  const hour = new Date().getHours();
+  const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
+  const note = db.notes[d] || '';
+
+  const head = all.length
+    ? (all.length === all.filter(t=>t.done).length ? '今天的事都办完了' : `还有 ${all.filter(t=>!t.done).length} 件事等着你`)
+    : '今天还没有安排';
+
+  // 当天出现过的标签，用于筛选
+  const usedIds = [];
+  all.forEach(t => { if(t.tag && usedIds.indexOf(t.tag) < 0) usedIds.push(t.tag); });
+  if(filter && usedIds.indexOf(filter) < 0) usedIds.push(filter);
+  const filterBar = usedIds.length ? `
+  <div class="filterbar">
+    <button class="fchip ${!filter?'on':''}" data-act="filter" data-tag="">全部 <span style="opacity:.55">${all.length}</span></button>
+    ${usedIds.map(id => {
+      const tg = tagById(id);
+      if(!tg) return '';
+      const n = all.filter(t => t.tag === id).length;
+      return `<button class="fchip ${filter===id?'on':''}" data-act="filter" data-tag="${id}">
+        <i style="background:${tg.color}"></i>${esc(tg.name)} <span style="opacity:.55">${n}</span></button>`;
+    }).join('')}
+  </div>` : '';
+
+  const curTag = filter ? tagById(filter) : null;
+  const ph = curTag
+    ? `记一条「${curTag.name}」的日程…`
+    : (isToday ? '说一句就能记，如：明天下午3点跟张总过方案' : '记一件 ' + fmtMD(d) + ' 的事…');
+
+  const qtagbar = `
+  <div class="qtagbar" id="qtagbar">
+    <span class="qtag-label">归入</span>
+    ${db.tags.map(tg => `<button type="button" class="qtag" data-qtag="${tg.id}"><i style="background:${tg.color}"></i>${esc(tg.name)}</button>`).join('')}
+  </div>`;
+
+  const items = list.length ? list.map(t => `
+    <div class="item ${t.done?'done':''}" data-id="${t.id}">
+      <button class="check" data-act="toggle" data-id="${t.id}" aria-label="完成">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </button>
+      <div class="item-main" data-act="edit" data-id="${t.id}">
+        <div class="item-title">${esc(t.title)}</div>
+        <div class="item-meta">
+          ${t.start ? `<span class="item-time"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>${t.start}${t.end?'–'+t.end:''}</span>` : `<span class="item-time muted">随时</span>`}
+          ${tagChip(t.tag)}
+          ${t.note ? `<span class="item-time muted" title="${esc(t.note)}">备注</span>` : ''}
+        </div>
+      </div>
+      <button class="item-del" data-act="del" data-id="${t.id}" aria-label="删除">×</button>
+    </div>`).join('') : `
+    <div class="empty">
+      <div class="empty-big">○</div>
+      ${filter ? '这个标签下还没有安排' : (isToday ? '今天还很空，从上面说一句话开始' : '这天还没有安排')}
+    </div>`;
+
+  return `
+  <div class="topbar">
+    <div>
+      <div class="brand">Daily Log</div>
+      <div class="greet-date">${fmtMD(d)} ${WD[day.getDay()]}</div>
+      <div class="greet-sub">${isToday ? greet + '，' + head : head}</div>
+    </div>
+    <div style="display:flex;gap:7px;align-items:center">
+      ${isToday ? '' : `<button class="today-badge" data-act="backToday">回到今天</button>`}
+      <button class="today-badge" data-act="dayShift" data-n="-1">‹</button>
+      <button class="today-badge" data-act="dayShift" data-n="1">›</button>
+    </div>
+  </div>
+
+  <div class="quick">
+    <input id="quickInput" placeholder="${ph}" autocomplete="off" enterkeyhint="done">
+    <button data-act="add" aria-label="添加">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+  </div>
+  <div class="quick-hint" id="quickHint"></div>
+  ${qtagbar}
+  ${filterBar}
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">${curTag ? `<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:${curTag.color};display:block"></i>${esc(curTag.name)}</span>` : '安排'}</span>
+      <span class="card-meta">${list.length ? doneCount + ' / ' + list.length + ' 完成' : '—'}</span>
+    </div>
+    ${list.length ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ''}
+    <div class="list">${items}</div>
+    ${curTag ? `<button class="addrow" data-act="focusQuick">＋ 在「${esc(curTag.name)}」下记一条</button>` : ''}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">今日随记</span><span class="card-meta" id="noteState">${note?'已保存':''}</span></div>
+    <textarea id="dailyNote" placeholder="今天有什么值得记下来的？一句话也行。周末写周记时，这些是最有用的材料。">${esc(note)}</textarea>
+  </div>
+
+  <div class="note-tip">
+    <b>小提示</b>：输入框支持「明天下午3点跟张总过方案」「周五上午10点半评审」，会自动拆成日期、时间和标题。<br>
+    想直接带上标签，就在末尾加 <b>#工作</b>，例如「明天下午3点评审 #会议」。
+  </div>`;
+}
+
+/* ---------------- 专注视图 ---------------- */
+function viewFocus(){
+  const today = todayStr();
+  const todays = tasksOf(today);
+  const openTasks = todays.filter(t => !t.done);
+  const sess = db.sessions.filter(s => s.date === today);
+  const totalMin = sess.reduce((a,b) => a + b.minutes, 0);
+  const prog = pomo.total > 0 ? pomo.remain / pomo.total : 1;
+  const sec = Math.ceil(pomo.remain / 1000);
+  const timeText = pad(Math.floor(sec/60)) + ':' + pad(sec%60);
+  const isFocus = pomo.mode === 'focus';
+
+  const opts = [`<option value="">不关联任务</option>`].concat(
+    openTasks.map(t => {
+      const tg = tagById(t.tag);
+      return `<option value="${t.id}" ${pomo.taskId===t.id?'selected':''}>${tg ? '[' + esc(tg.name) + '] ' : ''}${esc(t.title)}</option>`;
+    })
+  ).join('');
+
+  const startLabel = pomo.running ? '暂停' : (pomo.remain < pomo.total ? '继续' : (isFocus ? '开始专注' : '开始休息'));
+
+  return `
+  <div class="topbar">
+    <div>
+      <div class="brand">Focus</div>
+      <div class="greet-date">番茄钟</div>
+      <div class="greet-sub">${isFocus ? '专注 ' + db.settings.pomo + ' 分钟，然后休息 ' + db.settings.brk + ' 分钟' : '休息 ' + db.settings.brk + ' 分钟'}</div>
+    </div>
+  </div>
+
+  <div class="card" style="padding:26px 18px 22px">
+    <div class="pomo">
+      <div class="ringwrap">
+        <svg class="ring ${isFocus?'':'break'}" viewBox="0 0 240 240">
+          <circle class="bg" cx="120" cy="120" r="104"></circle>
+          <circle class="fg" id="ringFg" cx="120" cy="120" r="104"
+            style="stroke-dasharray:${C.toFixed(2)};stroke-dashoffset:${(C*(1-prog)).toFixed(2)}"></circle>
+        </svg>
+        <div class="pomo-inner">
+          <div class="pomo-time" id="pomoTime">${timeText}</div>
+          <div class="pomo-mode ${isFocus?'focus':'break'}">${isFocus?'Focus':'Break'}</div>
+        </div>
+      </div>
+
+      <div class="pomo-task">
+        <select id="pomoTask">${opts}</select>
+      </div>
+
+      <div class="pomo-actions">
+        <button class="btn ${pomo.running?'btn-ghost':(isFocus?'btn-primary':'btn-green')}" data-act="pomoToggle">${startLabel}</button>
+        <button class="btn btn-ghost" data-act="pomoReset">重置</button>
+        <button class="btn btn-ghost" data-act="pomoSkip">跳过</button>
+      </div>
+
+      <div class="pomo-stats">
+        <div class="pstat"><b>${sess.length}</b><span>今日轮次</span></div>
+        <div class="pstat"><b>${totalMin >= 60 ? (totalMin/60).toFixed(1) : totalMin}</b><span>${totalMin>=60?'小时':'分钟'}专注</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note-tip">
+    <b>为什么锁屏也不会算错</b>：计时以「结束时间点」为准，不是每秒累加，所以手机息屏、切到别的应用再回来，时间依然准确。<br>
+    <b>提醒</b>：首次开始时会请求通知权限。网页通知在部分手机上不可靠，把本页「添加到主屏幕」后成功率更高。
+  </div>`;
+}
+
+/* ---------------- 周记视图 ---------------- */
+function weekData(anchor){
+  const start = anchor;
+  const end = addDays(anchor, 6);
+  const tasks = db.tasks.filter(t => t.date >= start && t.date <= end);
+  const done = tasks.filter(t => t.done);
+  const undone = tasks.filter(t => !t.done);
+  const sessions = db.sessions.filter(s => s.date >= start && s.date <= end);
+  const minutes = sessions.reduce((a,b) => a + b.minutes, 0);
+  const days = [];
+  for(let i=0;i<7;i++){
+    const d = addDays(start, i);
+    days.push({
+      date: d,
+      label: WD[parseYmd(d).getDay()].replace('周',''),
+      count: tasks.filter(t => t.date === d).length,
+      doneCount: tasks.filter(t => t.date === d && t.done).length,
+      note: db.notes[d] || ''
+    });
+  }
+  const activeDays = days.filter(x => x.count > 0 || x.note).length;
+  return { start, end, tasks, done, undone, sessions, minutes, days, activeDays };
+}
+
+function viewWeekly(){
+  const w = weekData(state.weekAnchor);
+  const rate = w.tasks.length ? Math.round(w.done.length / w.tasks.length * 100) : 0;
+  const maxCount = Math.max(1, ...w.days.map(d => d.count));
+  const todayS = todayStr();
+
+  const cols = w.days.map(d => `
+    <div class="col ${d.count?'has':''} ${d.date===todayS?'today':''}">
+      <div class="bar-v" style="height:${Math.max(3, d.count/maxCount*68)}px"></div>
+      <div class="lbl">${d.label}</div>
+    </div>`).join('');
+
+  const doneRows = w.done.length ? w.done
+    .sort((a,b)=> a.date.localeCompare(b.date) || (a.start||'').localeCompare(b.start||''))
+    .map(t => `<div class="row ok"><span class="d">${fmtShort(t.date)}</span><span class="t">${tagChip(t.tag)} ${esc(t.title)}</span></div>`).join('')
+    : `<div class="muted" style="font-size:13px;padding:4px 0">本周还没有完成的记录</div>`;
+
+  const undoneRows = w.undone.length ? w.undone
+    .sort((a,b)=> a.date.localeCompare(b.date))
+    .map(t => `<div class="row"><span class="d">${fmtShort(t.date)}</span><span class="t">${tagChip(t.tag)} ${esc(t.title)}</span></div>`).join('')
+    : `<div class="muted" style="font-size:13px;padding:4px 0">没有遗留事项，很好</div>`;
+
+  const noteRows = w.days.filter(d => d.note).map(d =>
+    `<div class="row"><span class="d">${fmtShort(d.date)}</span><span class="t">${esc(d.note)}</span></div>`
+  ).join('') || `<div class="muted" style="font-size:13px;padding:4px 0">本周还没有随记</div>`;
+
+  const isThisWeek = state.weekAnchor === mondayOf(todayStr());
+
+  // 按标签聚合
+  const tagAgg = db.tags.map(tg => {
+    const items = w.tasks.filter(t => t.tag === tg.id);
+    return { tg, total: items.length, done: items.filter(x => x.done).length };
+  }).filter(x => x.total > 0).sort((a,b) => b.total - a.total);
+  const noTagCount = w.tasks.filter(t => !t.tag).length;
+  const maxTag = Math.max(1, ...tagAgg.map(x => x.total));
+  const tagStatsHtml = tagAgg.length ? `
+    <div class="tagstats">
+      ${tagAgg.map(x => `
+        <div class="ts-row">
+          <span class="ts-name"><i style="background:${x.tg.color}"></i>${esc(x.tg.name)}</span>
+          <span class="ts-track"><i style="width:${Math.round(x.total/maxTag*100)}%;background:${x.tg.color}"></i></span>
+          <span class="ts-val">${x.done}/${x.total}</span>
+        </div>`).join('')}
+      ${noTagCount ? `
+        <div class="ts-row">
+          <span class="ts-name" style="color:var(--ink3)"><i style="background:#c9c5bd"></i>未分类</span>
+          <span class="ts-track"><i style="width:${Math.round(noTagCount/maxTag*100)}%;background:#c9c5bd"></i></span>
+          <span class="ts-val">${w.tasks.filter(t=>!t.tag&&t.done).length}/${noTagCount}</span>
+        </div>` : ''}
+    </div>` : `<div class="muted" style="font-size:13px;padding:4px 0">本周还没有带标签的日程</div>`;
+
+  return `
+  <div class="topbar">
+    <div>
+      <div class="brand">Review</div>
+      <div class="greet-date">周记</div>
+      <div class="greet-sub">${isThisWeek ? '本周进行中，数据会实时更新' : '历史周回顾'}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="week-nav">
+      <button class="wk-btn" data-act="weekShift" data-n="-7">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div style="text-align:center">
+        <div class="week-range">${fmtShort(w.start)} — ${fmtShort(w.end)}</div>
+        <div style="font-size:11.5px;color:var(--ink3);margin-top:1px">${isThisWeek?'本周':'第 ' + isoWeek(w.start) + ' 周'}</div>
+      </div>
+      <button class="wk-btn" data-act="weekShift" data-n="7">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat"><b>${w.tasks.length}</b><span>日程总数</span></div>
+      <div class="stat"><b>${rate}%</b><span>完成率</span></div>
+      <div class="stat"><b>${w.sessions.length}</b><span>专注轮次</span></div>
+      <div class="stat"><b>${w.minutes>=60?(w.minutes/60).toFixed(1)+'h':w.minutes+'m'}</b><span>专注时长</span></div>
+    </div>
+
+    <div class="sec-title">每日分布</div>
+    <div class="chart">${cols}</div>
+
+    <div class="sec-title">按标签分布 <span style="text-transform:none;letter-spacing:0;font-weight:400">（完成/总数）</span></div>
+    ${tagStatsHtml}
+
+    <div class="sec-title">本周完成</div>
+    <div class="dlist">${doneRows}</div>
+
+    <div class="sec-title">未完成 / 遗留</div>
+    <div class="dlist">${undoneRows}</div>
+
+    <div class="sec-title">每日随记</div>
+    <div class="dlist">${noteRows}</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">周记草稿</span>
+      <span class="card-meta">${state.draft ? '可编辑' : '未生成'}</span>
+    </div>
+    ${state.draft ? `
+      <textarea class="draft" id="draftBox">${esc(state.draft)}</textarea>
+      <div class="act-row">
+        <button class="btn btn-primary" data-act="copyDraft">复制全文</button>
+        <button class="btn btn-ghost" data-act="copyPrompt">复制给 AI 的提示词</button>
+        <button class="btn btn-ghost" data-act="saveDraftMd">下载 .md</button>
+      </div>
+    ` : `
+      <div class="empty" style="padding:18px 10px">
+        <div class="empty-big">✎</div>
+        把这一周的数据整理成一份草稿
+      </div>
+      <button class="btn btn-primary" data-act="genDraft" style="width:100%">生成周记草稿</button>
+    `}
+  </div>
+
+  <div class="note-tip">
+    <b>周记不是周末憋出来的</b>，是平时顺手记出来的。日程和随记记得越勤，这里生成的草稿就越像你自己写的。
+  </div>`;
+}
+
+function isoWeek(dateStr){
+  const d = parseYmd(dateStr);
+  const target = new Date(d.valueOf());
+  const dayNr = (d.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = new Date(target.getFullYear(), 0, 4);
+  const diff = (target - firstThursday) / 86400000;
+  return 1 + Math.round((diff - 3 + ((firstThursday.getDay() + 6) % 7)) / 7);
+}
+
+function buildDraft(){
+  const w = weekData(state.weekAnchor);
+  const rate = w.tasks.length ? Math.round(w.done.length / w.tasks.length * 100) : 0;
+  const L = [];
+  L.push(`# 第 ${isoWeek(w.start)} 周周记（${fmtShort(w.start)} – ${fmtShort(w.end)}）`);
+  L.push('');
+  L.push('## 本周概览');
+  L.push(`- 日程 ${w.tasks.length} 条，完成 ${w.done.length} 条（完成率 ${rate}%）`);
+  L.push(`- 专注 ${w.sessions.length} 轮，累计 ${w.minutes >= 60 ? Math.floor(w.minutes/60)+' 小时 '+(w.minutes%60)+' 分' : w.minutes+' 分钟'}`);
+  L.push(`- 有效记录 ${w.activeDays} 天`);
+  L.push('');
+  L.push('## 分类投入');
+  const agg = tagAggOf(w.tasks);
+  if(agg.length){
+    agg.forEach(x => {
+      L.push(`- ${x.tg.name}：${x.total} 条，完成 ${x.done} 条（${Math.round(x.done/x.total*100)}%）`);
+    });
+  } else {
+    L.push('- （本周还没有记录）');
+  }
+  L.push('');
+  L.push('## 本周完成');
+  if(w.done.length){
+    const byDay = {};
+    w.done.forEach(t => { (byDay[t.date] = byDay[t.date] || []).push(t.title); });
+    Object.keys(byDay).sort().forEach(d => {
+      L.push(`- ${fmtShort(d)} ${WD[parseYmd(d).getDay()]}：${byDay[d].join('、')}`);
+    });
+  } else {
+    L.push('- （本周暂无完成记录）');
+  }
+  L.push('');
+  L.push('## 未完成 / 需要跟进');
+  if(w.undone.length){
+    w.undone.sort((a,b)=>a.date.localeCompare(b.date)).forEach(t => {
+      L.push(`- ${fmtShort(t.date)}：${t.title}`);
+    });
+  } else {
+    L.push('- 无');
+  }
+  L.push('');
+  L.push('## 每日随记');
+  const noted = w.days.filter(d => d.note);
+  if(noted.length){
+    noted.forEach(d => L.push(`- ${fmtShort(d.date)}：${d.note}`));
+  } else {
+    L.push('- （本周没有随记）');
+  }
+  L.push('');
+  L.push('## 本周小结');
+  L.push('');
+  L.push('（在这里写 2–3 句：这周最重要的一件事、最大的卡点、有什么变化。）');
+  L.push('');
+  L.push('## 下周计划');
+  L.push('');
+  L.push('1. ');
+  L.push('2. ');
+  L.push('3. ');
+  return L.join('\n');
+}
+
+function buildAIPrompt(){
+  const w = weekData(state.weekAnchor);
+  const rate = w.tasks.length ? Math.round(w.done.length / w.tasks.length * 100) : 0;
+  const tagName = t => (tagById(t.tag) || {name:'未分类'}).name;
+  const done = w.done.map(t => `${fmtShort(t.date)} [${tagName(t)}] ${t.title}`).join('；') || '无';
+  const undone = w.undone.map(t => `${fmtShort(t.date)} [${tagName(t)}] ${t.title}`).join('；') || '无';
+  const aggLine = tagAggOf(w.tasks).map(x => `${x.tg.name} 完成 ${x.done}/${x.total}`).join('，') || '无';
+  const notes = w.days.filter(d => d.note).map(d => `${fmtShort(d.date)}：${d.note}`).join('\n') || '无';
+  return `请帮我写一份职场周记，用第一人称，语气平实、不浮夸、不用空洞的形容词，总长度控制在 500 字以内。
+
+结构要求：
+1. 本周概览（1 段，概括节奏与重点）
+2. 主要进展（分点，每点说清做了什么、到什么程度）
+3. 问题与风险（诚实写卡点，不要美化）
+4. 下周计划（3 条以内，具体可执行）
+
+以下是我这一周的原始记录，请基于事实来写，不要编造未提及的内容：
+
+【数据】日程 ${w.tasks.length} 条，完成 ${w.done.length} 条（${rate}%）；专注 ${w.sessions.length} 轮，共 ${w.minutes} 分钟。
+
+【分类分布】${aggLine}
+
+【已完成】${done}
+
+【未完成/遗留】${undone}
+
+【每日随记】
+${notes}`;
+}
+
+/* ---------------- 设置视图 ---------------- */
+function syncBadge(){
+  if(!syncState.available) return { cls:'bad',  text:'组件未加载' };
+  if(!syncState.configured) return { cls:'warn', text:'未配置' };
+  if(!syncState.user)       return { cls:'warn', text:'未登录' };
+  if(syncState.status === 'error')   return { cls:'bad',  text:'同步出错' };
+  if(syncState.status === 'syncing') return { cls:'warn', text:'同步中' };
+  return { cls:'ok', text:'已同步' };
+}
+
+function viewSettings(){
+  // 云端已登录时，数据本身就有异地副本，不必再天天催导出
+  const needBackup = !syncState.user && (!storageInfo.lastExportAt || (Date.now() - storageInfo.lastExportAt) > 7 * 86400000);
+  const totalNotes = Object.keys(db.notes || {}).length;
+  const sbBadge = syncBadge();
+  const folderBadge = !folderInfo.supported ? { cls:'warn', text:'不支持' }
+    : !folderInfo.name ? { cls:'warn', text:'未设置' }
+    : folderInfo.needPerm ? { cls:'warn', text:'待授权' }
+    : { cls:'ok', text:'自动备份中' };
+  return `
+  <div class="topbar">
+    <div>
+      <div class="brand">Settings</div>
+      <div class="greet-date">设置</div>
+      <div class="greet-sub">数据存在本机数据库，不上传任何服务器</div>
+    </div>
+  </div>
+
+  ${needBackup ? `
+  <div class="warnbar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 9v5"/><circle cx="12" cy="17.5" r="1"/><path d="M10.3 3.9 2.4 18a1.6 1.6 0 0 0 1.4 2.4h16.4a1.6 1.6 0 0 0 1.4-2.4L13.7 3.9a1.6 1.6 0 0 0-2.8 0z"/></svg>
+    <div><b>建议现在导出一份备份。</b>${storageInfo.lastExportAt ? '距上次导出已经过去 ' + ago(storageInfo.lastExportAt) + '。' : '你还没有导出过备份。'}浏览器数据被清理、换设备时，导出的 JSON 是唯一能带走的东西。</div>
+  </div>` : ''}
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">番茄钟</span></div>
+    <div class="field">
+      <div><label>专注时长</label><div class="desc">建议 25 分钟，可以按自己的节奏调整</div></div>
+      <input type="number" id="setPomo" min="1" max="120" value="${db.settings.pomo}">
+    </div>
+    <div class="field">
+      <div><label>休息时长</label><div class="desc">建议 5 分钟</div></div>
+      <input type="number" id="setBrk" min="1" max="60" value="${db.settings.brk}">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">标签</span>
+      <button class="addtag" data-act="addTag">+ 新建</button>
+    </div>
+    ${db.tags.map(tg => `
+      <div class="tm-row">
+        <input class="tm-name" value="${esc(tg.name)}" data-tagname="${tg.id}" maxlength="8" spellcheck="false">
+        <div class="swatches">
+          ${PALETTE.map(c => `<button class="sw ${tg.color===c?'on':''}" style="background:${c}" data-act="tagColor" data-id="${tg.id}" data-color="${c}" aria-label="选择颜色"></button>`).join('')}
+        </div>
+        <button class="tm-del" data-act="delTag" data-id="${tg.id}" aria-label="删除标签">×</button>
+      </div>`).join('')}
+    <div class="desc" style="margin-top:10px;line-height:1.7">改名、换色会立刻反映到所有日程上。删除标签不会删日程，只是把相关日程变成「未分类」。</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">云端同步</span>
+      <span class="badge ${sbBadge.cls}">${sbBadge.text}</span>
+    </div>
+    ${!syncState.available ? `
+      <div class="desc" style="line-height:1.7">同步组件没加载出来（可能没联网）。本地数据不受影响，联网后刷新页面即可。</div>
+    ` : !syncState.configured ? `
+      <div class="desc" style="line-height:1.7;margin-bottom:12px">
+        填上 Supabase 项目的两个值，数据就会同时存到云端，手机和电脑共用一份，清浏览器数据也不怕。
+      </div>
+      <div class="mfield"><label>Project URL</label><input id="sbUrl" placeholder="https://xxxx.supabase.co" spellcheck="false" autocomplete="off"></div>
+      <div class="mfield"><label>anon public key</label><input id="sbKey" placeholder="eyJhbGciOiJIUzI1NiIs..." spellcheck="false" autocomplete="off"></div>
+      <div class="act-row">
+        <button class="btn btn-primary" data-act="sbConnect">连接</button>
+        <button class="btn btn-ghost" data-act="sbSql">复制建表 SQL</button>
+      </div>
+      <div class="desc" style="margin-top:10px;line-height:1.75">
+        第一次用：在 Supabase 新建项目 → 左侧 Settings → API 里复制 Project URL 和 anon key → 填到上面 → 点「复制建表 SQL」贴到 SQL Editor 执行一次。
+      </div>
+    ` : !syncState.user ? `
+      <div class="desc" style="line-height:1.7;margin-bottom:12px">云端已连接，登录后开始同步。</div>
+      <div class="mfield"><label>邮箱</label><input id="sbEmail" type="email" placeholder="you@example.com" spellcheck="false" autocomplete="off"></div>
+      <div class="mfield"><label>密码</label><input id="sbPwd" type="password" placeholder="至少 6 位" autocomplete="off"></div>
+      <div class="act-row">
+        <button class="btn btn-primary" data-act="sbLogin">登录</button>
+        <button class="btn btn-ghost" data-act="sbRegister">注册新账号</button>
+      </div>
+      <div class="desc" style="margin-top:10px;line-height:1.75">注册后如果提示要确认邮箱，去邮箱点一下链接再回来登录。也可以在 Supabase 的 Authentication → Providers 里关掉邮箱确认，省掉这一步。</div>
+    ` : `
+      <div class="field"><label>账号</label><span class="card-meta">${esc(syncState.user.email || '已登录')}</span></div>
+      <div class="field"><label>状态</label><span class="card-meta">${syncState.status === 'syncing' ? '同步中…' : syncState.status === 'error' ? '出错' : '正常'}</span></div>
+      <div class="field"><label>上次同步</label><span class="card-meta">${syncState.lastSyncAt ? ago(syncState.lastSyncAt) : '—'}</span></div>
+      ${syncState.error ? `<div class="desc" style="color:#b4472f;margin-top:8px;word-break:break-all">${esc(syncState.error)}</div>` : ''}
+      <div class="act-row">
+        <button class="btn btn-primary" data-act="sbSyncNow">立即同步</button>
+        <button class="btn btn-ghost" data-act="sbLogout">退出账号</button>
+      </div>
+    `}
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">文件夹备份</span>
+      <span class="badge ${folderBadge.cls}">${folderBadge.text}</span>
+    </div>
+    ${!folderInfo.supported ? `
+      <div class="desc" style="line-height:1.7">当前浏览器不支持自动写文件。用电脑版 Chrome 或 Edge 打开即可启用；手机上不需要它，手机靠云端同步。</div>
+    ` : !folderInfo.name ? `
+      <div class="desc" style="line-height:1.75;margin-bottom:12px">
+        选一个文件夹（建议直接选坚果云或 OneDrive 的同步目录），每次改动会自动写一份 JSON 进去。网盘负责把它传到你的其他设备——这是完全独立于云端的第二份备份。
+      </div>
+      <button class="btn btn-primary" data-act="pickFolder" style="width:100%">选择文件夹</button>
+    ` : `
+      <div class="field"><label>文件夹</label><span class="card-meta">${esc(folderInfo.name)}</span></div>
+      <div class="field"><label>最后写入</label><span class="card-meta">${folderInfo.lastWriteAt ? ago(folderInfo.lastWriteAt) : '还没写入'}</span></div>
+      <div class="desc" style="margin-top:8px;line-height:1.7">会写入 <b>dailylog.json</b>（最新一份）和 <b>archive/dailylog-日期.json</b>（每天一份，便于回看）。</div>
+      ${folderInfo.needPerm ? `<div class="desc" style="color:#a5642f;margin-top:8px">浏览器重启后需要点一次重新授权，浏览器不允许后台静默申请权限。</div>` : ''}
+      ${folderInfo.error ? `<div class="desc" style="color:#b4472f;margin-top:8px;word-break:break-all">${esc(folderInfo.error)}</div>` : ''}
+      <div class="act-row">
+        ${folderInfo.needPerm
+          ? `<button class="btn btn-primary" data-act="reauthFolder">重新授权</button>`
+          : `<button class="btn btn-ghost" data-act="writeNow">立即写入</button>`}
+        <button class="btn btn-ghost" data-act="pickFolder">换一个</button>
+        <button class="btn btn-ghost" data-act="closeFolder">关闭</button>
+      </div>
+    `}
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">数据状态</span>
+      <span class="badge ${storageInfo.idb ? 'ok' : 'bad'}">${storageInfo.idb ? '双写正常' : '已降级'}</span>
+    </div>
+    <div class="field">
+      <div>
+        <label>存储引擎</label>
+        <div class="desc">${storageInfo.idb ? 'localStorage + IndexedDB 同时写入，任一层损坏都能自愈' : '浏览器数据库不可用，当前只写 localStorage，风险较高'}</div>
+      </div>
+    </div>
+    <div class="field"><label>日程 / 随记</label><span class="card-meta">${db.tasks.length} 条 / ${totalNotes} 天</span></div>
+    <div class="field"><label>最后保存</label><span class="card-meta">${ago(storageInfo.lastSaveAt)}</span></div>
+    <div class="field"><label>历史快照</label><span class="card-meta">${storageInfo.snapshots} 份</span></div>
+    <div class="field"><label>上次导出备份</label><span class="card-meta">${storageInfo.lastExportAt ? ago(storageInfo.lastExportAt) : '从未导出'}</span></div>
+    <div class="act-row">
+      <button class="btn btn-ghost" data-act="showSnaps">历史快照</button>
+      <button class="btn btn-primary" data-act="exportJSON">导出备份</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">提醒</span></div>
+    <div class="field" style="display:block">
+      <label>导出到系统日历（推荐）</label>
+      <div class="desc" style="margin:4px 0 12px">导出 .ics 文件，导入手机或电脑日历后，由系统负责到点提醒。锁屏也会响，比网页通知可靠得多。</div>
+      <button class="btn btn-primary" data-act="exportICS" style="width:100%">导出全部日程（.ics）</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">导入 / 清空</span></div>
+    <div class="field" style="display:block">
+      <div class="desc" style="margin-bottom:12px">从备份文件恢复会覆盖当前全部数据。清空是不可撤销的，执行前会自动留一份快照。</div>
+      <div class="act-row" style="margin-top:0">
+        <button class="btn btn-ghost" data-act="importJSON">导入备份</button>
+        <button class="btn btn-danger" data-act="clearAll">清空所有数据</button>
+      </div>
+      <input type="file" id="importFile" accept=".json,application/json" class="hide">
+    </div>
+  </div>
+
+  <div class="note-tip">
+    <b>数据在哪</b>：这台设备的浏览器数据库里（IndexedDB），并同步写一份到 localStorage。每 10 分钟自动留一份历史快照，最多保留 40 份。<br>
+    <b>还是会丢的情况</b>：手动清除浏览器数据、重装浏览器、换设备。<b>这三件事只能靠导出备份或云端同步解决</b>，本地数据库挡不住。
+  </div>`;
+}
+
+/* ---------------- 渲染 ---------------- */
+const TABS = [
+  { id:'today', label:'今天', icon:'<rect x="3" y="4.5" width="18" height="16" rx="3"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6"/><line x1="16" y1="2.5" x2="16" y2="6"/>' },
+  { id:'focus', label:'专注', icon:'<circle cx="12" cy="13" r="8"/><line x1="12" y1="5" x2="12" y2="2.5"/><line x1="9.5" y1="2.5" x2="14.5" y2="2.5"/>' },
+  { id:'weekly', label:'周记', icon:'<path d="M6 3.5h9l4.5 4.5v12a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 3.5z"/><polyline points="14.5 3.5 14.5 8.5 19.5 8.5"/><line x1="8.5" y1="13" x2="15.5" y2="13"/><line x1="8.5" y1="16.5" x2="13" y2="16.5"/>' },
+  { id:'settings', label:'设置', icon:'<line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/>' }
+];
+
+function renderTabbar(){
+  document.getElementById('tabbar').innerHTML = TABS.map(t => `
+    <button class="tab ${state.tab===t.id?'active':''}" data-tab="${t.id}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${t.icon}</svg>
+      <span>${t.label}</span>
+    </button>`).join('');
+}
+
+function render(){
+  if(state.todayDate !== todayStr() && state.tab === 'today'){
+    // 跨天时保持用户所选日期，不强制跳转
+  }
+  let html = '';
+  if(state.tab === 'today') html = viewToday();
+  else if(state.tab === 'focus') html = viewFocus();
+  else if(state.tab === 'weekly') html = viewWeekly();
+  else html = viewSettings();
+  document.getElementById('view').innerHTML = html;
+  renderTabbar();
+  if(state.tab === 'today') bindQuick();
+}
+
+/* ---------------- 快速输入 ---------------- */
+function bindQuick(){
+  const input = document.getElementById('quickInput');
+  if(!input) return;
+  const bar = document.getElementById('qtagbar');
+  input.addEventListener('input', updateHint);
+  input.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ e.preventDefault(); submitQuick(); }
+    if(e.key === 'Escape'){ input.blur(); }
+  });
+  input.addEventListener('focus', () => { if(bar) bar.classList.add('show'); });
+  input.addEventListener('blur', () => {
+    setTimeout(() => { if(bar) bar.classList.remove('show'); }, 180);
+  });
+  updateHint();
+}
+function updateHint(){
+  const input = document.getElementById('quickInput');
+  const hint = document.getElementById('quickHint');
+  if(!input || !hint) return;
+  const v = input.value.trim();
+  if(!v){ hint.innerHTML = ''; return; }
+  const p = parseQuick(v);
+  const d = parseYmd(p.date);
+  const isToday = p.date === todayStr();
+  const isTom = p.date === addDays(todayStr(), 1);
+  const dLabel = isToday ? '今天' : isTom ? '明天' : (fmtShort(p.date) + ' ' + WD[d.getDay()]);
+  const explicit = p.tags || [];
+  const inherited = (!explicit.length && state.filterTag) ? tagById(state.filterTag) : null;
+  hint.innerHTML = `<span>识别为</span>
+    <span class="chip">${dLabel}</span>
+    ${p.start ? `<span class="chip">${p.start}</span>` : `<span class="muted" style="font-size:12px">不设时间</span>`}
+    ${explicit.map(n => `<span class="chip" style="background:var(--line2);color:var(--ink2)">#${esc(n)}</span>`).join('')}
+    ${inherited ? `<span class="chip" style="background:${hexA(inherited.color,.13)};color:${inherited.color}">归入 ${esc(inherited.name)}</span>` : ''}
+    <b style="font-size:12.5px;color:var(--ink2);font-weight:550">${esc(p.title)}</b>`;
+}
+function submitQuick(){
+  const input = document.getElementById('quickInput');
+  if(!input) return;
+  const v = input.value.trim();
+  if(!v) return;
+  const p = parseQuick(v);
+  // 标签优先级：句子里显式写的 #标签 > 当前正在查看的标签 > 不归类
+  const tagId = (p.tags && p.tags.length) ? ensureTag(p.tags[0]) : (state.filterTag || '');
+  db.tasks.push({
+    id: uid(), date: p.date, start: p.start, end: '',
+    title: p.title,
+    tag: tagId,
+    note: '', done: false, createdAt: Date.now()
+  });
+  save();
+  input.value = '';
+  const hint = document.getElementById('quickHint');
+  if(hint) hint.innerHTML = '';
+  // 若在标签视图下记了另一类的事，跟着切过去，保证新建的这条能被看见
+  if(state.filterTag && tagId !== state.filterTag) state.filterTag = tagId;
+  const tg = tagById(tagId);
+  toast('已记下：' + p.title + (tg ? ' · ' + tg.name : ''));
+  render();
+  const ni = document.getElementById('quickInput');
+  if(ni) ni.focus();
+}
+
+/* ---------------- 编辑弹窗 ---------------- */
+function openEdit(id){
+  const t = db.tasks.find(x => x.id === id);
+  if(!t) return;
+  state.editingId = id;
+  state.modalTag = t.tag || '';
+  const mask = document.createElement('div');
+  mask.className = 'mask';
+  mask.id = 'mask';
+  mask.innerHTML = `
+    <div class="modal">
+      <h3>编辑日程</h3>
+      <div class="mfield"><label>标题</label><input id="mTitle" value="${esc(t.title)}"></div>
+      <div class="mfield"><label>日期</label><input type="date" id="mDate" value="${t.date}"></div>
+      <div class="mrow">
+        <div class="mfield"><label>开始</label><input type="time" id="mStart" value="${t.start||''}"></div>
+        <div class="mfield"><label>结束</label><input type="time" id="mEnd" value="${t.end||''}"></div>
+      </div>
+      <div class="mfield">
+        <label>标签</label>
+        <div class="tagpick" id="mTagPick">
+          <button class="pick ${!t.tag?'on':''}" data-mtag="">无</button>
+          ${db.tags.map(tg => `
+            <button class="pick ${t.tag===tg.id?'on':''}" data-mtag="${tg.id}"
+              ${t.tag===tg.id?`style="color:${tg.color};background:${hexA(tg.color,.12)};border-color:${hexA(tg.color,.38)}"`:''}>
+              <i style="background:${tg.color}"></i>${esc(tg.name)}
+            </button>`).join('')}
+        </div>
+      </div>
+      <div class="mfield"><label>备注</label><textarea id="mNote" rows="3" placeholder="补充信息，会写进日历事件里">${esc(t.note||'')}</textarea></div>
+      <div class="mact">
+        <button class="btn btn-danger" data-mact="del">删除</button>
+        <button class="btn btn-primary" data-mact="save">保存</button>
+      </div>
+    </div>`;
+  document.body.appendChild(mask);
+  mask.addEventListener('click', e => {
+    if(e.target === mask){ closeModal(); return; }
+    const pick = e.target.closest('[data-mtag]');
+    if(pick){
+      state.modalTag = pick.dataset.mtag;
+      mask.querySelectorAll('.pick').forEach(p => {
+        p.classList.remove('on');
+        p.removeAttribute('style');
+      });
+      pick.classList.add('on');
+      const tg = tagById(state.modalTag);
+      if(tg){
+        pick.style.color = tg.color;
+        pick.style.background = hexA(tg.color, .12);
+        pick.style.borderColor = hexA(tg.color, .38);
+      }
+    }
+  });
+  mask.querySelector('[data-mact="save"]').addEventListener('click', () => {
+    const title = document.getElementById('mTitle').value.trim();
+    if(!title){ toast('标题不能为空'); return; }
+    t.title = title;
+    t.date = document.getElementById('mDate').value || t.date;
+    t.start = document.getElementById('mStart').value || '';
+    t.end = document.getElementById('mEnd').value || '';
+    t.tag = state.modalTag || '';
+    t.note = document.getElementById('mNote').value.trim();
+    save(); closeModal(); render(); toast('已保存');
+  });
+  mask.querySelector('[data-mact="del"]').addEventListener('click', () => {
+    db.tasks = db.tasks.filter(x => x.id !== id);
+    save(); closeModal(); render(); toast('已删除');
+  });
+  setTimeout(() => { const el = document.getElementById('mTitle'); if(el) el.focus(); }, 60);
+}
+function closeModal(){
+  const m = document.getElementById('mask');
+  if(m) m.remove();
+  state.editingId = null;
+}
+
+function fmtDateTime(ts){
+  const d = new Date(ts);
+  return (d.getMonth()+1) + '月' + d.getDate() + '日 ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+/* 历史快照：查看与回滚 */
+async function openSnaps(){
+  const list = await idbList('snapshots');
+  if(!list.length){
+    toast(storageInfo.idb ? '还没有快照，用一会儿会自动生成' : '浏览器数据库不可用，没有快照');
+    return;
+  }
+  list.sort((a,b) => b.at - a.at);
+  const mask = document.createElement('div');
+  mask.className = 'mask';
+  mask.id = 'mask';
+  mask.innerHTML = `
+    <div class="modal">
+      <h3>历史快照</h3>
+      <div style="font-size:12.5px;color:var(--ink3);margin:-8px 0 14px;line-height:1.6">每 10 分钟自动留一份，最多 40 份。恢复前会把当前数据也存成一份，操作可以反悔。</div>
+      <div class="snaplist">
+        ${list.map(s => `
+          <div class="snaprow">
+            <div class="st">
+              <div class="sd">${fmtDateTime(s.at)}</div>
+              <div class="sm">${s.tasks || 0} 条日程 · ${s.notes || 0} 天随记 · ${ago(s.at)}</div>
+            </div>
+            <button data-snap="${s.at}">恢复</button>
+          </div>`).join('')}
+      </div>
+      <div class="mact"><button class="btn btn-ghost" data-mact="close">关闭</button></div>
+    </div>`;
+  document.body.appendChild(mask);
+
+  mask.addEventListener('click', async (e) => {
+    if(e.target === mask){ closeModal(); return; }
+    if(e.target.dataset && e.target.dataset.mact === 'close'){ closeModal(); return; }
+    const btn = e.target.closest ? e.target.closest('[data-snap]') : null;
+    if(!btn) return;
+    const at = Number(btn.dataset.snap);
+    const snap = list.find(x => x.at === at);
+    if(!snap) return;
+    if(!confirm('恢复到 ' + fmtDateTime(at) + ' 的数据？\n当前数据会先自动存一份快照，可以再撤回来。')) return;
+
+    // 先给当前状态留档
+    await idbWrite('snapshots', {
+      at: Date.now(), json: JSON.stringify(db),
+      tasks: db.tasks.length, notes: Object.keys(db.notes || {}).length
+    });
+    try{
+      db = normalizeDB(JSON.parse(snap.json));
+      save();
+      storageInfo.lastSaveAt = db.savedAt;
+      migrateTags();
+      closeModal(); render();
+      toast('已恢复到 ' + fmtDateTime(at));
+    }catch(err){
+      toast('这份快照已损坏，无法恢复');
+    }
+  });
+}
+
+/* ---------------- 导出 ---------------- */
+function download(name, content, type){
+  const blob = new Blob([content], { type: type || 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 400);
+}
+
+function icsEscape(s){
+  return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
+}
+function icsStamp(){
+  const d = new Date();
+  return d.getUTCFullYear()+pad(d.getUTCMonth()+1)+pad(d.getUTCDate())+'T'+pad(d.getUTCHours())+pad(d.getUTCMinutes())+pad(d.getUTCSeconds())+'Z';
+}
+function addMinutes(hhmm, min){
+  const [h,m] = hhmm.split(':').map(Number);
+  let total = h*60 + m + min;
+  total = ((total % 1440) + 1440) % 1440;
+  return pad(Math.floor(total/60))+':'+pad(total%60);
+}
+function exportICS(){
+  const list = db.tasks.filter(t => t.start).sort((a,b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+  if(!list.length){ toast('还没有带时间的日程，先记几条吧'); return; }
+  const L = [
+    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Daily Log//CN','CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH','X-WR-CALNAME:我的日程','X-WR-TIMEZONE:Asia/Shanghai'
+  ];
+  list.forEach(t => {
+    const d = t.date.replace(/-/g,'');
+    const st = t.start.replace(':','') + '00';
+    const en = (t.end || addMinutes(t.start, 30)).replace(':','') + '00';
+    L.push('BEGIN:VEVENT');
+    L.push('UID:' + t.id + '@dailylog');
+    L.push('DTSTAMP:' + icsStamp());
+    L.push('DTSTART;TZID=Asia/Shanghai:' + d + 'T' + st);
+    L.push('DTEND;TZID=Asia/Shanghai:' + d + 'T' + en);
+    L.push('SUMMARY:' + icsEscape(t.title));
+    if(t.note) L.push('DESCRIPTION:' + icsEscape(t.note));
+    const tg = tagById(t.tag);
+    if(tg) L.push('CATEGORIES:' + icsEscape(tg.name));
+    L.push('STATUS:' + (t.done ? 'COMPLETED' : 'CONFIRMED'));
+    L.push('BEGIN:VALARM','TRIGGER:-PT10M','ACTION:DISPLAY','DESCRIPTION:' + icsEscape(t.title),'END:VALARM');
+    L.push('END:VEVENT');
+  });
+  L.push('END:VCALENDAR');
+  download('我的日程.ics', L.join('\r\n'), 'text/calendar;charset=utf-8');
+  toast('已导出 ' + list.length + ' 条日程');
+}
+
+/* ---------------- 事件 ---------------- */
+document.addEventListener('click', e => {
+  const tabBtn = e.target.closest('[data-tab]');
+  if(tabBtn){
+    state.tab = tabBtn.dataset.tab;
+    if(state.tab === 'today' && state.todayDate !== todayStr()){
+      // 保持当前查看日期
+    }
+    render();
+    window.scrollTo({ top:0, behavior:'smooth' });
+    return;
+  }
+
+  const el = e.target.closest('[data-act]');
+  if(!el) return;
+  const act = el.dataset.act;
+
+  if(act === 'add'){ submitQuick(); }
+  else if(act === 'toggle'){
+    const t = db.tasks.find(x => x.id === el.dataset.id);
+    if(t){ t.done = !t.done; t.doneAt = t.done ? Date.now() : null; save(); render(); }
+  }
+  else if(act === 'edit'){ openEdit(el.dataset.id); }
+  else if(act === 'del'){
+    e.stopPropagation();
+    const id = el.dataset.id;
+    db.tasks = db.tasks.filter(x => x.id !== id);
+    save(); render(); toast('已删除');
+  }
+  else if(act === 'dayShift'){
+    state.todayDate = addDays(state.todayDate, +el.dataset.n);
+    render();
+  }
+  else if(act === 'backToday'){ state.todayDate = todayStr(); render(); }
+  else if(act === 'filter'){
+    state.filterTag = el.dataset.tag || '';
+    render();
+  }
+  else if(act === 'focusQuick'){
+    const inp = document.getElementById('quickInput');
+    if(inp){
+      inp.scrollIntoView({ behavior:'smooth', block:'center' });
+      setTimeout(() => inp.focus(), 230);
+    }
+  }
+  else if(act === 'addTag'){
+    const id = 't' + uid().slice(0,6);
+    db.tags.push({ id, name: '新标签', color: PALETTE[db.tags.length % PALETTE.length] });
+    save(); render();
+    setTimeout(() => {
+      const inp = document.querySelector('[data-tagname="' + id + '"]');
+      if(inp){ inp.focus(); inp.select(); }
+    }, 60);
+  }
+  else if(act === 'tagColor'){
+    const tg = tagById(el.dataset.id);
+    if(tg){ tg.color = el.dataset.color; save(); render(); }
+  }
+  else if(act === 'delTag'){
+    const id = el.dataset.id;
+    const tg = tagById(id);
+    const n = tagUsage(id);
+    if(!confirm('删除标签「' + (tg ? tg.name : '') + '」？' + (n ? '\n有 ' + n + ' 条日程会变成未分类。' : ''))) return;
+    db.tags = db.tags.filter(x => x.id !== id);
+    db.tasks.forEach(t => { if(t.tag === id) t.tag = ''; });
+    if(state.filterTag === id) state.filterTag = '';
+    save(); render(); toast('已删除标签');
+  }
+  else if(act === 'pomoToggle'){ pomo.running ? pausePomo() : startPomo(); }
+  else if(act === 'pomoReset'){ resetPomo(); }
+  else if(act === 'pomoSkip'){ skipPomo(); }
+  else if(act === 'weekShift'){
+    state.weekAnchor = addDays(state.weekAnchor, +el.dataset.n);
+    state.draft = '';
+    render();
+  }
+  else if(act === 'genDraft'){
+    state.draft = buildDraft();
+    render();
+    toast('草稿已生成，可以改了');
+  }
+  else if(act === 'copyDraft'){
+    const box = document.getElementById('draftBox');
+    const text = box ? box.value : state.draft;
+    copyText(text);
+  }
+  else if(act === 'copyPrompt'){
+    copyText(buildAIPrompt());
+  }
+  else if(act === 'saveDraftMd'){
+    const box = document.getElementById('draftBox');
+    const text = box ? box.value : state.draft;
+    download('周记-' + state.weekAnchor + '.md', text, 'text/markdown;charset=utf-8');
+  }
+  else if(act === 'exportICS'){ exportICS(); }
+  else if(act === 'exportJSON'){
+    download('dailylog-backup-' + todayStr() + '.json', JSON.stringify(db, null, 2), 'application/json');
+    db.settings.lastExportAt = Date.now();
+    storageInfo.lastExportAt = db.settings.lastExportAt;
+    save();
+    toast('备份已下载');
+    if(state.tab === 'settings') setTimeout(render, 60);
+  }
+  else if(act === 'showSnaps'){ openSnaps(); }
+  else if(act === 'sbConnect'){
+    const url = ((document.getElementById('sbUrl') || {}).value || '').trim();
+    const key = ((document.getElementById('sbKey') || {}).value || '').trim();
+    if(!/^https?:\/\/.+/.test(url) || key.length < 20){
+      toast('URL 或 anon key 看起来不对，检查一下');
+      return;
+    }
+    setCfg({ url: url.replace(/\/+$/,''), key: key });
+    toast('正在连接云端…');
+    initSupabase();
+  }
+  else if(act === 'sbSql'){ copyText(setupSQL()); }
+  else if(act === 'sbLogin' || act === 'sbRegister'){
+    const email = ((document.getElementById('sbEmail') || {}).value || '').trim();
+    const pwd = (document.getElementById('sbPwd') || {}).value || '';
+    if(!email || pwd.length < 6){ toast('请填邮箱和至少 6 位密码'); return; }
+    toast(act === 'sbLogin' ? '登录中…' : '注册中…');
+    const fn = act === 'sbLogin' ? sbLogin : sbRegister;
+    fn(email, pwd).then(r => { toast(r.msg); if(r.ok) render(); });
+  }
+  else if(act === 'sbSyncNow'){
+    toast('正在同步…');
+    pullFromCloud(false).then(ok => {
+      toast(ok ? '已与云端对齐' : '同步失败，下方有错误信息');
+    });
+  }
+  else if(act === 'sbLogout'){
+    if(confirm('退出云端账号？\n本地数据不会被删除，只是停止同步。')) sbLogout();
+  }
+  else if(act === 'pickFolder'){ pickFolder(); }
+  else if(act === 'reauthFolder'){ reauthFolder(); }
+  else if(act === 'writeNow'){
+    writeBackupFile().then(ok => toast(ok ? '已写入文件夹' : '写入失败，看下方提示'));
+  }
+  else if(act === 'closeFolder'){
+    if(confirm('关闭文件夹备份？\n已经写进去的文件不会被删除。')) closeFolder();
+  }
+  else if(act === 'importJSON'){
+    const f = document.getElementById('importFile');
+    if(f) f.click();
+  }
+  else if(act === 'clearAll'){
+    if(confirm('确定清空所有日程、专注记录和随记吗？\n清空前会自动留一份快照，可在「设置 → 历史快照」里找回。')){
+      if(idb){
+        idbWrite('snapshots', {
+          at: Date.now(), json: JSON.stringify(db),
+          tasks: db.tasks.length, notes: Object.keys(db.notes || {}).length
+        }).then(() => { storageInfo.snapshots++; });
+      }
+      db = defaultDB();
+      save();
+      try{ localStorage.removeItem(PKEY); }catch(e){}
+      state.filterTag = '';
+      state.draft = '';
+      pomo = { mode:'focus', total:db.settings.pomo*60000, remain:db.settings.pomo*60000, endAt:null, running:false, taskId:'', startAt:null };
+      render(); toast('已清空');
+    }
+  }
+});
+
+/* 快捷标签：用 mousedown 而非 click，避免输入框先失焦把标签条收起来 */
+document.addEventListener('mousedown', e => {
+  const q = (e.target && e.target.closest) ? e.target.closest('[data-qtag]') : null;
+  if(!q) return;
+  e.preventDefault();
+  const tg = tagById(q.dataset.qtag);
+  const input = document.getElementById('quickInput');
+  if(!tg || !input) return;
+  const base = input.value.replace(/#[^\s#]+/g, '').replace(/\s+/g, ' ').trim();
+  input.value = (base ? base + ' ' : '') + '#' + tg.name;
+  updateHint();
+  input.focus();
+});
+
+function copyText(text){
+  const done = () => toast('已复制到剪贴板');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+function fallbackCopy(text, cb){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+  document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); cb(); }catch(e){ toast('复制失败，请手动选择文本'); }
+  ta.remove();
+}
+
+/* 输入监听（不重建 DOM，避免丢焦点） */
+document.addEventListener('input', e => {
+  if(e.target.dataset && e.target.dataset.tagname){
+    const tg = tagById(e.target.dataset.tagname);
+    if(tg){
+      const v = e.target.value.trim();
+      if(v) { tg.name = v; save(); }
+    }
+  }
+  if(e.target.id === 'dailyNote'){
+    const d = state.todayDate;
+    const v = e.target.value;
+    if(v.trim()) db.notes[d] = v; else delete db.notes[d];
+    save();
+    const s = document.getElementById('noteState');
+    if(s){ s.textContent = '已保存'; clearTimeout(s._t); s._t = setTimeout(()=>{ s.textContent=''; }, 1400); }
+  }
+  if(e.target.id === 'setPomo' || e.target.id === 'setBrk'){
+    const v = Math.max(1, Math.min(120, parseInt(e.target.value,10) || 25));
+    if(e.target.id === 'setPomo') db.settings.pomo = v;
+    else db.settings.brk = Math.min(60, v);
+    save();
+    if(!pomo.running){
+      pomo.total = (pomo.mode==='focus'?db.settings.pomo:db.settings.brk) * 60000;
+      pomo.remain = pomo.total;
+      savePomo();
+    }
+  }
+});
+
+document.addEventListener('change', e => {
+  if(e.target.id === 'pomoTask'){
+    pomo.taskId = e.target.value;
+    savePomo();
+  }
+  if(e.target.id === 'importFile'){
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const data = JSON.parse(reader.result);
+        if(!data || !Array.isArray(data.tasks)) throw new Error('格式不对');
+        if(!confirm('导入会覆盖当前所有数据，确定继续吗？')) return;
+        db = Object.assign(defaultDB(), data);
+        if(!Array.isArray(db.tags) || !db.tags.length) db.tags = defaultTags();
+        save();
+        render();
+        toast('导入成功，共 ' + db.tasks.length + ' 条日程');
+      }catch(err){
+        toast('导入失败：文件格式不正确');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape') closeModal();
+});
+
+/* ---------------- 启动 ---------------- */
+migrateTags();
+render();
+bootStorage().then(() => initFolder());   // 异步校验数据库，再恢复文件夹句柄
+
+// 等外部脚本就绪后再连云端（失败不影响本地使用）
+try{
+  if(document.readyState === 'complete') initSupabase();
+  else window.addEventListener('load', () => initSupabase());
+}catch(e){}
+
+// 注册 Service Worker：只有 https（或 localhost）下才生效，file:// 打开会跳过
+try{
+  if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+}catch(e){}
+
+// 跨天自动刷新（长时间挂着的页面）
+let lastDay = todayStr();
+setInterval(() => {
+  const d = todayStr();
+  if(d !== lastDay){
+    lastDay = d;
+    if(state.tab === 'today' && state.todayDate !== d){ /* 保留用户选择 */ }
+    render();
+  }
+}, 60000);
+</script>
+</body>
+</html>
