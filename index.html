@@ -217,6 +217,20 @@ textarea::placeholder{color:var(--ink3)}
 .warnbar{display:flex;gap:10px;align-items:flex-start;background:#fdf1e4;border:1px solid #f2dfc7;border-radius:12px;padding:12px 14px;margin-top:14px;font-size:12.5px;line-height:1.65;color:#8a5726}
 .warnbar b{color:#6f4420}
 .warnbar svg{flex:0 0 auto;margin-top:1px}
+
+/* 首次使用引导条 */
+.guidebar{display:flex;gap:12px;align-items:flex-start;background:#fdf1e4;border:1px solid #f2dfc7;border-radius:13px;padding:13px 14px;margin-top:14px;font-size:12.5px;line-height:1.6;color:#8a5726}
+.guidebar .gtxt{flex:1;min-width:0}
+.guidebar b{display:block;color:#6f4420;font-size:13px;margin-bottom:2px}
+.guidebar .gact{display:flex;gap:6px;align-items:center;flex:0 0 auto}
+.guidebar .gact button[data-act="goSettings"]{font-size:12px;font-weight:650;color:#8a5726;background:#fff;border:1px solid #f2dfc7;padding:6px 11px;border-radius:8px;white-space:nowrap}
+.guidebar .gact button[data-act="goSettings"]:hover{border-color:#e2c9a6;background:#fffdf9}
+.guidebar .gx{border:none;background:transparent;font-size:17px;line-height:1;padding:2px 3px;color:#bd9668}
+.guidebar .gx:hover{color:#8a5726}
+
+/* 云端错误提示 */
+.errbox{margin-top:10px;padding:10px 12px;border-radius:9px;background:#fbeceb;border:1px solid #f2d5d1;color:#a4432e;font-size:12.5px;line-height:1.65;word-break:break-word}
+.errbox b{color:#8d3520}
 .snaplist{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto}
 .snaprow{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:#fcfbf9}
 .snaprow .st{flex:1;min-width:0}
@@ -516,6 +530,42 @@ const syncState = {
 let sb = null;
 let suppressPush = false;
 let pushTimer = null;
+
+/* ---- 首次使用引导（未接云端时提示一次，关掉后 7 天内不再打扰） ---- */
+const GUIDE_KEY = 'dailylog.guide.v1';
+function guideDismissed(){
+  try{
+    const o = JSON.parse(localStorage.getItem(GUIDE_KEY) || '{}');
+    if(!o.at) return false;
+    return (Date.now() - o.at) < 7 * 86400000;
+  }catch(e){ return false; }
+}
+function dismissGuide(){
+  try{ localStorage.setItem(GUIDE_KEY, JSON.stringify({ at: Date.now() })); }catch(e){}
+  render();
+}
+
+/* ---- 把 Supabase 的原始报错翻译成能看懂的话 ---- */
+function friendlyError(msg){
+  const m = String(msg || '');
+  if(/42P01|does not exist|schema cache/i.test(m))
+    return '数据表还没建。去 Supabase 的 SQL Editor 执行一次建表语句（点上面的「复制建表 SQL」）。';
+  if(/Email not confirmed/i.test(m))
+    return '邮箱还没确认。去收件箱点一下确认链接；或者去 Supabase 的 Authentication → Sign In / Providers 里关掉 Confirm email，再重新注册。';
+  if(/Invalid login credentials/i.test(m))
+    return '邮箱或密码不对。如果刚注册还没点邮件里的确认链接，先去确认。';
+  if(/JWT expired|token has expired|invalid JWT/i.test(m))
+    return '登录状态过期了。退出账号再登录一次即可。';
+  if(/Invalid API key|apikey/i.test(m))
+    return 'anon key 不对。回 Supabase 的 Settings → API 重新复制一次，别复制成 service_role key。';
+  if(/Failed to fetch|NetworkError|fetch failed|Load failed/i.test(m))
+    return '连不上 Supabase。检查网络，以及 Project URL 是否填对（形如 https://xxxx.supabase.co，后面不要加别的路径）。';
+  if(/row-level security|permission denied/i.test(m))
+    return '权限被拒绝。建表 SQL 里的 RLS 策略没执行成功，回 SQL Editor 整段重跑一次。';
+  if(/rate limit|too many/i.test(m))
+    return '请求太频繁，等一分钟再试。';
+  return m || '未知错误';
+}
 
 function getCfg(){
   try{
@@ -1194,6 +1244,7 @@ function viewToday(){
   </div>` : '';
 
   const curTag = filter ? tagById(filter) : null;
+  const showGuide = !syncState.configured && !guideDismissed();
   const ph = curTag
     ? `记一条「${curTag.name}」的日程…`
     : (isToday ? '说一句就能记，如：明天下午3点跟张总过方案' : '记一件 ' + fmtMD(d) + ' 的事…');
@@ -1237,6 +1288,18 @@ function viewToday(){
       <button class="today-badge" data-act="dayShift" data-n="1">›</button>
     </div>
   </div>
+
+  ${showGuide ? `
+  <div class="guidebar">
+    <div class="gtxt">
+      <b>数据现在只在这台设备上</b>
+      <span>接上云端后，手机和电脑才能共用一份，清浏览器数据也不怕丢。</span>
+    </div>
+    <div class="gact">
+      <button data-act="goSettings">去设置</button>
+      <button class="gx" data-act="dismissGuide" aria-label="关闭">×</button>
+    </div>
+  </div>` : ''}
 
   <div class="quick">
     <input id="quickInput" placeholder="${ph}" autocomplete="off" enterkeyhint="done">
@@ -1679,12 +1742,12 @@ function viewSettings(){
       <div class="field"><label>账号</label><span class="card-meta">${esc(syncState.user.email || '已登录')}</span></div>
       <div class="field"><label>状态</label><span class="card-meta">${syncState.status === 'syncing' ? '同步中…' : syncState.status === 'error' ? '出错' : '正常'}</span></div>
       <div class="field"><label>上次同步</label><span class="card-meta">${syncState.lastSyncAt ? ago(syncState.lastSyncAt) : '—'}</span></div>
-      ${syncState.error ? `<div class="desc" style="color:#b4472f;margin-top:8px;word-break:break-all">${esc(syncState.error)}</div>` : ''}
       <div class="act-row">
         <button class="btn btn-primary" data-act="sbSyncNow">立即同步</button>
         <button class="btn btn-ghost" data-act="sbLogout">退出账号</button>
       </div>
     `}
+    ${syncState.error ? `<div class="errbox">${esc(friendlyError(syncState.error))}</div>` : ''}
   </div>
 
   <div class="card">
@@ -2181,6 +2244,8 @@ document.addEventListener('click', e => {
     if(confirm('退出云端账号？\n本地数据不会被删除，只是停止同步。')) sbLogout();
   }
   else if(act === 'pickFolder'){ pickFolder(); }
+  else if(act === 'goSettings'){ state.tab = 'settings'; render(); window.scrollTo({ top:0 }); }
+  else if(act === 'dismissGuide'){ dismissGuide(); }
   else if(act === 'reauthFolder'){ reauthFolder(); }
   else if(act === 'writeNow'){
     writeBackupFile().then(ok => toast(ok ? '已写入文件夹' : '写入失败，看下方提示'));
