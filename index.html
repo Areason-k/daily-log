@@ -580,6 +580,8 @@ function setCfg(cfg){
 function setupSQL(){
   return [
     '-- 在 Supabase 控制台 → SQL Editor 里整段粘贴执行',
+    '-- 如果提示 Only singular query allowed，说明你的编辑器一次只收一条语句，',
+    '-- 那就按分号拆开，一条一条单独执行（共 5 条，顺序别乱）。',
     'create table if not exists public.daily_log (',
     '  user_id    uuid primary key references auth.users(id) on delete cascade,',
     "  data       jsonb not null default '{}'::jsonb,",
