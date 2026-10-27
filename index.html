@@ -600,8 +600,11 @@ function setupSQL(){
     'create policy own_data_update on public.daily_log',
     '  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);',
     '',
-    '-- 开启实时同步：多端改动互相推送',
-    'alter publication supabase_realtime add table public.daily_log;'
+    '-- 开启实时同步：多端改动互相推送（重复执行不会报错）',
+    'do $$ begin',
+    '  alter publication supabase_realtime add table public.daily_log;',
+    'exception when duplicate_object then null;',
+    'end $$;'
   ].join('\n');
 }
 
@@ -2221,7 +2224,10 @@ document.addEventListener('click', e => {
       toast('URL 或 anon key 看起来不对，检查一下');
       return;
     }
-    setCfg({ url: url.replace(/\/+$/,''), key: key });
+    // 很多人会把 Data API 页里的完整地址粘进来（带 /rest/v1/）。
+    // SDK 自己会拼这段路径，所以要先剥掉，否则会变成 /rest/v1/rest/v1/...
+    let cleanUrl = url.replace(/\/+$/, '').replace(/\/rest\/v1.*$/i, '').replace(/\/+$/, '');
+    setCfg({ url: cleanUrl, key: key });
     toast('正在连接云端…');
     initSupabase();
   }
