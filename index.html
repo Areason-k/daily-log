@@ -600,9 +600,11 @@ function setupSQL(){
     'create policy own_data_update on public.daily_log',
     '  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);',
     '',
-    '-- 开启实时同步：多端改动互相推送',
-    '-- 如果这句报 already member of publication，说明已经开过了，忽略即可',
-    'alter publication supabase_realtime add table public.daily_log;'
+    '-- 下面这句是开启实时同步，可选。',
+    '-- 如果你的 SQL 编辑器报错（部分版本不支持 alter publication 语法），',
+    '-- 直接删掉它，改用 Database → Publications → supabase_realtime 里手动勾选 daily_log。',
+    '-- 不开启也能正常用：应用会在每次切回页面时自动拉取最新数据。',
+    '-- alter publication supabase_realtime add table public.daily_log;'
   ].join('\n');
 }
 
@@ -2383,6 +2385,16 @@ bootStorage().then(() => initFolder());   // 异步校验数据库，再恢复�
 try{
   if(document.readyState === 'complete') initSupabase();
   else window.addEventListener('load', () => initSupabase());
+}catch(e){}
+
+// 切回页面时自动拉一次云端。
+// 这是实时订阅的兜底：即使 Supabase 没开 realtime，从手机切回电脑、
+// 或从别的标签页切回来，也能立刻拿到别处的最新改动。
+try{
+  document.addEventListener('visibilitychange', () => {
+    if(document.hidden) return;
+    if(sb && syncState.user) pullFromCloud(false);
+  });
 }catch(e){}
 
 // 注册 Service Worker：只有 https（或 localhost）下才生效，file:// 打开会跳过
