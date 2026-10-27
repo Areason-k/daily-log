@@ -600,11 +600,9 @@ function setupSQL(){
     'create policy own_data_update on public.daily_log',
     '  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);',
     '',
-    '-- 开启实时同步：多端改动互相推送（重复执行不会报错）',
-    'do $$ begin',
-    '  alter publication supabase_realtime add table public.daily_log;',
-    'exception when duplicate_object then null;',
-    'end $$;'
+    '-- 开启实时同步：多端改动互相推送',
+    '-- 如果这句报 already member of publication，说明已经开过了，忽略即可',
+    'alter publication supabase_realtime add table public.daily_log;'
   ].join('\n');
 }
 
