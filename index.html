@@ -315,7 +315,10 @@ function defaultDB(){
     sessions: [],
     notes: {},
     tags: defaultTags(),
-    settings: { pomo: 25, brk: 5 }
+    settings: { pomo: 25, brk: 5 },
+    drafts: {},        // 周记草稿，按周起始日存：{ '2026-10-26': '正文' }
+    dirty: false,      // 本地有未推送的改动（同步用，不上传）
+    syncedAt: ''       // 上次对齐时云端那行的 updated_at 原文（同步用，不上传）
   };
 }
 function normalizeDB(raw){
@@ -323,8 +326,11 @@ function normalizeDB(raw){
   if(!Array.isArray(d.tasks)) d.tasks = [];
   if(!Array.isArray(d.sessions)) d.sessions = [];
   if(!d.notes || typeof d.notes !== 'object') d.notes = {};
+  if(!d.drafts || typeof d.drafts !== 'object') d.drafts = {};
   if(!Array.isArray(d.tags) || !d.tags.length) d.tags = defaultTags();
   d.settings = Object.assign({ pomo:25, brk:5 }, d.settings || {});
+  if(typeof d.dirty !== 'boolean') d.dirty = false;
+  if(typeof d.syncedAt !== 'string') d.syncedAt = '';
   return d;
 }
 
@@ -431,6 +437,9 @@ async function pruneSnapshots(){
 
 function save(){
   db.savedAt = Date.now();
+  // 打上「有未推送改动」的标记。suppressPush 为真时说明这次是「应用云端数据」，
+  // 不是本地编辑，不能标脏，否则会把自己的回写又推上去形成回环。
+  if(!suppressPush) db.dirty = true;
   storageInfo.lastSaveAt = db.savedAt;
   const json = JSON.stringify(db);
 
@@ -459,6 +468,15 @@ function save(){
   schedulePush();
   // 第五层：文件夹备份（防抖 3 秒，交给坚果云 / OneDrive 去同步）
   scheduleFolderWrite();
+}
+
+/* 只写本地，不触发云端推送和文件夹备份。
+   同步状态（dirty / syncedAt）变了要落盘，但那是同步动作本身的结果，
+   再走一遍 save() 会形成「推送成功→保存→又推送」的死循环。 */
+function persistLocal(){
+  const json = JSON.stringify(db);
+  try { localStorage.setItem(KEY, json); } catch(e){}
+  if(idb) idbWrite('state', json, 'main');
 }
 
 /* 启动自愈：比较两层的保存时间，取更新的那份 */
@@ -646,6 +664,28 @@ async function initSupabase(){
   if(state.tab === 'settings') render();
 }
 
+/* 把云端那行套到本地。savedAt 用本地时钟，保证本地两层自愈仍按本地顺序判断 */
+function applyRemote(remoteDB, stamp){
+  suppressPush = true;
+  db = normalizeDB(remoteDB);
+  db.dirty = false;
+  db.syncedAt = stamp;
+  save();
+  suppressPush = false;
+  migrateTags();
+  render();
+}
+
+/* 比内容，不比时间。同步用的元字段和保存时间先剔掉 */
+function sameData(a, b){
+  const strip = (o) => {
+    const c = Object.assign({}, o);
+    delete c.savedAt; delete c.dirty; delete c.syncedAt;
+    return JSON.stringify(c);
+  };
+  return strip(a) === strip(b);
+}
+
 async function pullFromCloud(initial){
   if(!sb || !syncState.user) return false;
   try{
@@ -659,20 +699,36 @@ async function pullFromCloud(initial){
     if(!data || !data.data){
       await pushToCloud(true);          // 云端还是空的，把本地推上去
     } else {
-      const remoteAt = new Date(data.updated_at).getTime();
-      const localAt = db.savedAt || 0;
-      if(remoteAt > localAt + 1500){
-        suppressPush = true;
-        db = normalizeDB(data.data);
-        db.savedAt = remoteAt;
-        save();
-        suppressPush = false;
-        migrateTags();
-        render();
-        if(!initial) toast('已同步云端的最新改动');
-      } else if(localAt > remoteAt + 1500){
-        await pushToCloud(true);        // 本地更新，推上去
+      // 用「updated_at 是否还等于上次对齐时记下的那串」判断云端有没有变。
+      // 以前是比时间大小（remoteAt > localAt + 1500），但 localAt 来自本机时钟，
+      // 两台设备差几秒是常态，一旦差过 1.5 秒就会误判谁新，把更新的那份覆盖掉。
+      // 时间戳只做「相等 / 不相等」比较，就跟时钟准不准无关了。
+      const remoteStamp = String(data.updated_at || '');
+      const remoteDB = normalizeDB(data.data);
+      const remoteChanged = remoteStamp !== db.syncedAt;
+      const localDirty = !!db.dirty;
+
+      if(localDirty && remoteChanged){
+        // 两边都改过：云端是权威副本，但先把本地这份留档，别让它无声消失
+        if(idb) idbWrite('snapshots', {
+          at: Date.now(), json: JSON.stringify(db),
+          tasks: db.tasks.length, notes: Object.keys(db.notes || {}).length
+        }).then(() => pruneSnapshots());
+        applyRemote(remoteDB, remoteStamp);
+        toast('云端有更新的数据，已按云端覆盖（本地旧版已存进快照）');
+      } else if(localDirty){
+        await pushToCloud(true);        // 只有本地变了，推上去
+      } else if(remoteChanged){
+        if(sameData(remoteDB, db)){
+          // 内容一样（通常是自己刚推上去的回声），只补记时间戳，不重绘
+          db.syncedAt = remoteStamp;
+          persistLocal();
+        } else {
+          applyRemote(remoteDB, remoteStamp);
+          if(!initial) toast('已同步云端的最新改动');
+        }
       }
+      // 两边都没变：什么都不做
     }
     syncState.status = 'synced';
     syncState.lastSyncAt = Date.now();
@@ -692,12 +748,21 @@ async function pushToCloud(force){
   try{
     syncState.status = 'syncing';
     const now = new Date();
+    // dirty / syncedAt 是本地同步状态，不往云端传，免得别的设备读到后误判
+    const payload = Object.assign({}, db);
+    delete payload.dirty;
+    delete payload.syncedAt;
     const { error } = await sb.from(TABLE).upsert({
       user_id: syncState.user.id,
-      data: db,
+      data: payload,
       updated_at: now.toISOString()
     }, { onConflict: 'user_id' });
     if(error) throw error;
+    // 推成功：本地不再脏。syncedAt 清空表示「还不知道云端那行的新时间戳」，
+    // 下次 pull 会读到自己刚写的数据，内容相同就只补记时间戳，不会重绘。
+    db.dirty = false;
+    db.syncedAt = '';
+    persistLocal();
     syncState.status = 'synced';
     syncState.lastSyncAt = Date.now();
     syncState.lastPushAt = now.getTime();
@@ -719,24 +784,30 @@ function schedulePush(){
   pushTimer = setTimeout(() => { pushToCloud(); }, 1500);
 }
 
+let realtimeChannel = null;
+
 function subscribeRealtime(){
   if(!sb || !syncState.user) return;
   try{
-    sb.channel('daily_log_sync')
+    // 同名 channel 重复订阅会让 Supabase 报 tried to subscribe multiple times。
+    // 重新配置云端、重新登录都会走到这里，所以先拆掉旧的再建。
+    if(realtimeChannel){
+      try{ sb.removeChannel(realtimeChannel); }catch(e){}
+      realtimeChannel = null;
+    }
+    realtimeChannel = sb.channel('daily_log_sync')
       .on('postgres_changes', {
         event: '*', schema: 'public', table: TABLE,
         filter: 'user_id=eq.' + syncState.user.id
       }, (payload) => {
         const row = payload && payload.new;
         if(!row || !row.data) return;
-        const at = new Date(row.updated_at).getTime();
-        if(at <= syncState.lastPushAt + 3000) return;   // 自己写入的回声
-        suppressPush = true;
-        db = normalizeDB(row.data);
-        db.savedAt = at;
-        save();
-        suppressPush = false;
-        render();
+        const stamp = String(row.updated_at || '');
+        if(stamp === db.syncedAt) return;   // 这一版处理过了（自己的回声也走这条）
+        if(db.dirty) return;                // 本地有没推上去的改动，等 push 完再拉
+        const remoteDB = normalizeDB(row.data);
+        if(sameData(remoteDB, db)){ db.syncedAt = stamp; persistLocal(); return; }
+        applyRemote(remoteDB, stamp);
         toast('已同步其他设备的改动');
       })
       .subscribe();
@@ -1074,8 +1145,7 @@ const state = {
   weekAnchor: mondayOf(todayStr()),
   editingId: null,
   modalTag: '',
-  filterTag: '',
-  draft: ''
+  filterTag: ''
 };
 
 /* ---------------- 番茄钟 ---------------- */
@@ -1439,6 +1509,9 @@ function viewWeekly(){
   const rate = w.tasks.length ? Math.round(w.done.length / w.tasks.length * 100) : 0;
   const maxCount = Math.max(1, ...w.days.map(d => d.count));
   const todayS = todayStr();
+  // 草稿存在 db.drafts 里（按周起始日），不再只放在内存的 state 上，
+  // 这样切 tab、刷新、换设备都还在
+  const draft = db.drafts[state.weekAnchor] || '';
 
   const cols = w.days.map(d => `
     <div class="col ${d.count?'has':''} ${d.date===todayS?'today':''}">
@@ -1534,15 +1607,16 @@ function viewWeekly(){
   <div class="card">
     <div class="card-head">
       <span class="card-title">周记草稿</span>
-      <span class="card-meta">${state.draft ? '可编辑' : '未生成'}</span>
+      <span class="card-meta" id="draftState">${draft ? '已保存' : '未生成'}</span>
     </div>
-    ${state.draft ? `
-      <textarea class="draft" id="draftBox">${esc(state.draft)}</textarea>
+    ${draft ? `
+      <textarea class="draft" id="draftBox">${esc(draft)}</textarea>
       <div class="act-row">
         <button class="btn btn-primary" data-act="copyDraft">复制全文</button>
         <button class="btn btn-ghost" data-act="copyPrompt">复制给 AI 的提示词</button>
         <button class="btn btn-ghost" data-act="saveDraftMd">下载 .md</button>
       </div>
+      <div class="desc" style="margin-top:8px;font-size:11.5px;color:var(--ink3)">改动会自动保存，切到别的页面也不会丢。</div>
     ` : `
       <div class="empty" style="padding:18px 10px">
         <div class="empty-big">✎</div>
@@ -2104,7 +2178,20 @@ function exportICS(){
   if(!list.length){ toast('还没有带时间的日程，先记几条吧'); return; }
   const L = [
     'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Daily Log//CN','CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH','X-WR-CALNAME:我的日程','X-WR-TIMEZONE:Asia/Shanghai'
+    'METHOD:PUBLISH','X-WR-CALNAME:我的日程','X-WR-TIMEZONE:Asia/Shanghai',
+    // 必须带上 VTIMEZONE。只写 TZID=Asia/Shanghai 而不给时区定义时，
+    // 严格一点的客户端（Google 日历等）会忽略 TZID 按 UTC 解析，
+    // 整份日程就会整体偏移 8 小时。中国 1991 年后没有夏令时，一条 STANDARD 就够。
+    'BEGIN:VTIMEZONE',
+    'TZID:Asia/Shanghai',
+    'X-LIC-LOCATION:Asia/Shanghai',
+    'BEGIN:STANDARD',
+    'DTSTART:19700101T000000',
+    'TZOFFSETFROM:+0800',
+    'TZOFFSETTO:+0800',
+    'TZNAME:CST',
+    'END:STANDARD',
+    'END:VTIMEZONE'
   ];
   list.forEach(t => {
     const d = t.date.replace(/-/g,'');
@@ -2119,7 +2206,11 @@ function exportICS(){
     if(t.note) L.push('DESCRIPTION:' + icsEscape(t.note));
     const tg = tagById(t.tag);
     if(tg) L.push('CATEGORIES:' + icsEscape(tg.name));
-    L.push('STATUS:' + (t.done ? 'COMPLETED' : 'CONFIRMED'));
+    // VEVENT 的 STATUS 只认 TENTATIVE / CONFIRMED / CANCELLED，
+    // COMPLETED 是 VTODO 的值，写在事件里属于非法值，部分客户端会整条忽略。
+    L.push('STATUS:CONFIRMED');
+    // 已完成的日程不占用忙碌时间，用 TRANSP 表达，而不是伪造 STATUS
+    if(t.done) L.push('TRANSP:TRANSPARENT');
     L.push('BEGIN:VALARM','TRIGGER:-PT10M','ACTION:DISPLAY','DESCRIPTION:' + icsEscape(t.title),'END:VALARM');
     L.push('END:VEVENT');
   });
@@ -2201,25 +2292,24 @@ document.addEventListener('click', e => {
   else if(act === 'pomoSkip'){ skipPomo(); }
   else if(act === 'weekShift'){
     state.weekAnchor = addDays(state.weekAnchor, +el.dataset.n);
-    state.draft = '';
     render();
   }
   else if(act === 'genDraft'){
-    state.draft = buildDraft();
+    db.drafts[state.weekAnchor] = buildDraft();
+    save();
     render();
     toast('草稿已生成，可以改了');
   }
   else if(act === 'copyDraft'){
     const box = document.getElementById('draftBox');
-    const text = box ? box.value : state.draft;
-    copyText(text);
+    copyText(box ? box.value : (db.drafts[state.weekAnchor] || ''));
   }
   else if(act === 'copyPrompt'){
     copyText(buildAIPrompt());
   }
   else if(act === 'saveDraftMd'){
     const box = document.getElementById('draftBox');
-    const text = box ? box.value : state.draft;
+    const text = box ? box.value : (db.drafts[state.weekAnchor] || '');
     download('周记-' + state.weekAnchor + '.md', text, 'text/markdown;charset=utf-8');
   }
   else if(act === 'exportICS'){ exportICS(); }
@@ -2300,7 +2390,6 @@ document.addEventListener('click', e => {
       if(sb && syncState.user) pushToCloud(true);
       try{ localStorage.removeItem(PKEY); }catch(e){}
       state.filterTag = '';
-      state.draft = '';
       pomo = { mode:'focus', total:db.settings.pomo*60000, remain:db.settings.pomo*60000, endAt:null, running:false, taskId:'', startAt:null };
       render(); toast('已清空');
     }
@@ -2355,6 +2444,16 @@ document.addEventListener('input', e => {
     save();
     const s = document.getElementById('noteState');
     if(s){ s.textContent = '已保存'; clearTimeout(s._t); s._t = setTimeout(()=>{ s.textContent=''; }, 1400); }
+  }
+  if(e.target.id === 'draftBox'){
+    // 草稿按周存进 db，切 tab / 刷新 / 换设备都不会丢。
+    // 这里只存不重绘，否则光标会被打断。
+    const key = state.weekAnchor;
+    const v = e.target.value;
+    if(v) db.drafts[key] = v; else delete db.drafts[key];
+    save();
+    const st = document.getElementById('draftState');
+    if(st) st.textContent = v ? '已保存' : '未生成';
   }
   if(e.target.id === 'setPomo' || e.target.id === 'setBrk'){
     const v = Math.max(1, Math.min(120, parseInt(e.target.value,10) || 25));
