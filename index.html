@@ -579,9 +579,15 @@ function setCfg(cfg){
 
 function setupSQL(){
   return [
-    '-- 在 Supabase 控制台 → SQL Editor 里整段粘贴执行',
-    '-- 如果提示 Only singular query allowed，说明你的编辑器一次只收一条语句，',
-    '-- 那就按分号拆开，一条一条单独执行（共 5 条，顺序别乱）。',
+    '-- 建表脚本，可以重复执行，不会报错。',
+    '--',
+    '-- 首选：Table Editor → New table，手动建表更快也更稳（见设置页说明）。',
+    '-- 表名必须是 daily_log（小写 + 下划线，写成 Daily-Log 会查不到）。',
+    '-- 三列：user_id uuid 主键 / data jsonb 默认 {} / updated_at timestamptz 默认 now()',
+    '--',
+    '-- 如果你的 SQL Editor 允许执行 DDL，整段粘进来跑一次最省事。',
+    '-- 若报 Only SELECT queries allowed，说明这个账户的 SQL Editor 是只读的，',
+    '-- 别在这里耗时间，改走 Table Editor 图形化建表。',
     'create table if not exists public.daily_log (',
     '  user_id    uuid primary key references auth.users(id) on delete cascade,',
     "  data       jsonb not null default '{}'::jsonb,",
@@ -1726,13 +1732,20 @@ function viewSettings(){
         填上 Supabase 项目的两个值，数据就会同时存到云端，手机和电脑共用一份，清浏览器数据也不怕。
       </div>
       <div class="mfield"><label>Project URL</label><input id="sbUrl" placeholder="https://xxxx.supabase.co" spellcheck="false" autocomplete="off"></div>
-      <div class="mfield"><label>anon public key</label><input id="sbKey" placeholder="eyJhbGciOiJIUzI1NiIs..." spellcheck="false" autocomplete="off"></div>
+      <div class="mfield"><label>publishable key（旧版叫 anon key）</label><input id="sbKey" placeholder="sb_publishable_... 或 eyJhbGciOiJIUzI1NiIs..." spellcheck="false" autocomplete="off"></div>
       <div class="act-row">
         <button class="btn btn-primary" data-act="sbConnect">连接</button>
         <button class="btn btn-ghost" data-act="sbSql">复制建表 SQL</button>
       </div>
-      <div class="desc" style="margin-top:10px;line-height:1.75">
-        第一次用：在 Supabase 新建项目 → 左侧 Settings → API 里复制 Project URL 和 anon key → 填到上面 → 点「复制建表 SQL」贴到 SQL Editor 执行一次。
+      <div class="desc" style="margin-top:12px;line-height:1.8">
+        <b>第一次用，按这个顺序：</b><br>
+        1. 左侧 <b>Data API</b> 页复制 Project URL（形如 https://xxxx.supabase.co）<br>
+        2. 左侧 <b>API Keys</b> 页复制 publishable key（<b>sb_publishable_…</b>，别复制成 secret key）<br>
+        3. 建表用 <b>Table Editor → New table</b>，表名必须是 <b>daily_log</b>（小写加下划线），三列：<b>user_id</b> uuid 主键、<b>data</b> jsonb、<b>updated_at</b> timestamptz<br>
+        4. 表建好后点右上角 <b>Add RLS policy</b>，加三条策略：select 用 <b>using</b>、insert 用 <b>with check</b>、update 两个都要，Target roles 选 <b>authenticated</b>
+      </div>
+      <div class="desc" style="margin-top:8px;line-height:1.75;color:var(--ink3)">
+        部分账户的 SQL Editor 是只读的（会报 Only SELECT queries allowed），那种情况走上面的 Table Editor 就行，不必用「复制建表 SQL」。
       </div>
     ` : !syncState.user ? `
       <div class="desc" style="line-height:1.7;margin-bottom:12px">云端已连接，登录后开始同步。</div>
@@ -2266,15 +2279,25 @@ document.addEventListener('click', e => {
     if(f) f.click();
   }
   else if(act === 'clearAll'){
-    if(confirm('确定清空所有日程、专注记录和随记吗？\n清空前会自动留一份快照，可在「设置 → 历史快照」里找回。')){
+    const cloudWarn = (sb && syncState.user)
+      ? '\n\n注意：云端副本会被一起清空。清空前会自动留一份本地快照，可在「设置 → 历史快照」里找回。'
+      : '';
+    if(confirm('确定清空所有日程、专注记录和随记吗？\n清空前会自动留一份快照，可在「设置 → 历史快照」里找回。' + cloudWarn)){
+      const before = JSON.stringify(db);
       if(idb){
         idbWrite('snapshots', {
-          at: Date.now(), json: JSON.stringify(db),
+          at: Date.now(), json: before,
           tasks: db.tasks.length, notes: Object.keys(db.notes || {}).length
         }).then(() => { storageInfo.snapshots++; });
       }
       db = defaultDB();
+      // 清空是一次明确的用户操作，必须让云端立刻对齐。
+      // 如果只走 save() 的 1.5 秒防抖，期间关页面或断网，云端会留下旧数据，
+      // 下次 pullFromCloud 又会把旧数据"恢复"回来，看起来像清空没生效。
+      suppressPush = true;
       save();
+      suppressPush = false;
+      if(sb && syncState.user) pushToCloud(true);
       try{ localStorage.removeItem(PKEY); }catch(e){}
       state.filterTag = '';
       state.draft = '';
